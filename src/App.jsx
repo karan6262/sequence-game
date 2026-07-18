@@ -3,7 +3,7 @@ import io from 'socket.io-client';
 import confetti from 'canvas-confetti';
 import { BOARD_LAYOUT } from './constants';
 
-const socket = io.connect('https://sequence-server-g51u.onrender.com'); // Update to Render URL
+const socket = io.connect('https://sequence-server-g51u.onrender.com'); // IMPORTANT: Paste your Render URL here
 
 const AVATARS = ['😎', '🦊', '🦁', '🦄', '👽', '💀', '🤖', '👑'];
 
@@ -39,7 +39,7 @@ export default function SequenceGame() {
   const [activePlayerName, setActivePlayerName] = useState('Waiting...');
   const [timeLeft, setTimeLeft] = useState(60);
 
-  const [hostId, setHostId] = useState(null); // NEW: Track the Host
+  const [hostId, setHostId] = useState(null); 
 
   const [myTeam, setMyTeam] = useState('');
   const [hand, setHand] = useState([]);
@@ -105,6 +105,21 @@ export default function SequenceGame() {
     socket.on('error_message', alert);
     return () => socket.offAny();
   }, [playerId, myTeam, winner]);
+
+  useEffect(() => {
+    if (!turnDeadline || winner || !isGameStarted) {
+      setTimeLeft(60);
+      return;
+    }
+    const interval = setInterval(() => {
+      const remaining = Math.max(0, Math.floor((turnDeadline - Date.now()) / 1000));
+      setTimeLeft(remaining);
+      if (remaining === 0 && socket.id === activePlayerId) {
+        socket.emit('timeout_skip', { roomId: currentRoom, playerId });
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [turnDeadline, winner, isGameStarted, activePlayerId, currentRoom, playerId]);
 
   const handleJoinRoom = (e) => {
     e.preventDefault();
@@ -212,15 +227,16 @@ export default function SequenceGame() {
     </div>
   );
 
+  // Define logic booleans *after* team select check to prevent undefined errors
   const isMyTurn = playerId === activePlayerId && isGameStarted && !winner;
   const isDeadCard = selectedCard && checkDeadCard(selectedCard);
 
   return (
     <div className={`min-h-[100dvh] ${t.bg} text-white flex flex-col md:flex-row p-2 sm:p-4 gap-4 overflow-hidden font-sans relative`}>
       
-      {/* WAITING TO START OVERLAY (Updated Logic) */}
+      {/* WAITING TO START OVERLAY (Prioritized below winner) */}
       {!isGameStarted && !winner && (
-        <div className="absolute inset-0 z-40 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center animate-in fade-in duration-500">
+        <div className="absolute inset-0 z-40 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center animate-in fade-in duration-500">
           <h2 className={`text-4xl sm:text-6xl font-black mb-4 tracking-widest text-center ${getTeamNeon(myTeam)}`}>
             {myTeam.toUpperCase()} SQUAD DEPLOYED
           </h2>
@@ -228,7 +244,7 @@ export default function SequenceGame() {
           {playerId === hostId ? (
             <>
               <p className="text-slate-300 mb-8 font-bold tracking-widest text-center">
-                You are the Room Host.<br/> Players in Room: {roomInfo.total} / 12
+                You are the Room Host.<br/> Players: {roomInfo.total}
               </p>
               
               <div className="flex gap-4 mb-8">
@@ -251,7 +267,7 @@ export default function SequenceGame() {
         </div>
       )}
 
-      {/* GAME OVER OVERLAY */}
+      {/* GAME OVER OVERLAY (HIGHEST PRIORITY Z-50) */}
       {winner && (
         <div className="absolute inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center animate-in fade-in duration-300">
           <h1 className={`text-6xl sm:text-8xl font-black mb-10 tracking-[0.2em] ${getTeamNeon(winner)}`}>{winner.toUpperCase()} WINS</h1>
@@ -295,15 +311,20 @@ export default function SequenceGame() {
 
         <div className="w-full mt-6 flex flex-col items-center">
           <p className="text-xs font-bold opacity-50 mb-4 tracking-widest">RIGHT CLICK BOARD TO PING TEAMMATES</p>
-          <div className="flex -space-x-4">
-            {(hand || []).map((card, i) => (
-              <div key={i} onClick={() => isMyTurn && setSelectedCard(card)} className={`relative w-16 h-24 sm:w-20 sm:h-28 ${t.card} rounded-lg flex items-center justify-center origin-bottom transition-all ${selectedCard===card?'ring-4 ring-white -translate-y-6 scale-110 z-20':'z-0'} ${isMyTurn?'cursor-pointer hover:-translate-y-4':'opacity-50'}`}>
-                <span className={`font-black text-xl sm:text-2xl ${card.includes('♥')||card.includes('♦')?'text-red-600':'text-black'}`}>{card}</span>
+          {/* Gate the hand/dead card trading so they don't render after a win */}
+          {!winner && (
+            <>
+              <div className="flex -space-x-4">
+                {(hand || []).map((card, i) => (
+                  <div key={i} onClick={() => isMyTurn && setSelectedCard(card)} className={`relative w-16 h-24 sm:w-20 sm:h-28 ${t.card} rounded-lg flex items-center justify-center origin-bottom transition-all ${selectedCard===card?'ring-4 ring-white -translate-y-6 scale-110 z-20':'z-0'} ${isMyTurn?'cursor-pointer hover:-translate-y-4':'opacity-50'}`}>
+                    <span className={`font-black text-xl sm:text-2xl ${card.includes('♥')||card.includes('♦')?'text-red-600':'text-black'}`}>{card}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          {isMyTurn && isDeadCard && (
-            <button onClick={() => {socket.emit('trade_dead_card', {roomId: currentRoom, playerId, deadCard: selectedCard}); setSelectedCard(null)}} className="mt-4 bg-rose-600 px-6 py-2 rounded-full font-bold animate-bounce shadow-lg shadow-rose-500/50">TRADE DEAD CARD</button>
+              {isMyTurn && isDeadCard && (
+                <button onClick={() => {socket.emit('trade_dead_card', {roomId: currentRoom, playerId, deadCard: selectedCard}); setSelectedCard(null)}} className="mt-4 bg-rose-600 px-6 py-2 rounded-full font-bold animate-bounce shadow-lg shadow-rose-500/50">TRADE DEAD CARD</button>
+              )}
+            </>
           )}
         </div>
       </div>
