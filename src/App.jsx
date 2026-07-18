@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import io from 'socket.io-client';
 import { BOARD_LAYOUT } from './constants';
 
-const socket = io.connect('https://sequence-server-g51u.onrender.com'); // Update to Render URL later
+const socket = io.connect('http://localhost:3001'); // Update to Render URL later
 
 export default function SequenceGame() {
   const [appState, setAppState] = useState('lobby');
@@ -15,7 +15,6 @@ export default function SequenceGame() {
   const [currentTurn, setCurrentTurn] = useState('red');
   const [winner, setWinner] = useState(null);
   
-  // NEW: Individual Turn Tracking
   const [activePlayerId, setActivePlayerId] = useState(null);
   const [activePlayerName, setActivePlayerName] = useState('Waiting...');
 
@@ -71,9 +70,7 @@ export default function SequenceGame() {
   const handleCellClick = (index) => {
     if (winner) return;
     
-    // NEW STRICT VALIDATION: Must match socket.id
     if (socket.id !== activePlayerId) return alert("It is not your turn!");
-    
     if (!selectedCard) return alert("Please select a card from your hand first.");
     
     const targetSpace = BOARD_LAYOUT[index];
@@ -101,6 +98,11 @@ export default function SequenceGame() {
 
     setHand(hand.filter(card => card !== selectedCard));
     setSelectedCard(null);
+  };
+
+  // NEW: Emit Restart to Server
+  const handleRestartGame = () => {
+    socket.emit('restart_game', currentRoom);
   };
 
   const getCardColor = (cardString) => {
@@ -176,10 +178,18 @@ export default function SequenceGame() {
   return (
     <div className="min-h-screen bg-green-800 text-white flex flex-col items-center justify-center p-4 font-sans relative">
       
+      {/* Game Over Overlay - Now with Play Again functionality! */}
       {winner && (
-        <div className="absolute inset-0 z-50 bg-black/80 flex flex-col items-center justify-center">
-          <h1 className={`text-6xl font-bold mb-4 drop-shadow-xl uppercase ${getTeamTextColor(winner)}`}>{winner} TEAM WINS!</h1>
-          <button onClick={() => window.location.reload()} className="bg-yellow-500 text-black font-bold py-3 px-6 rounded-lg hover:bg-yellow-400">Leave Game</button>
+        <div className="absolute inset-0 z-50 bg-black/90 flex flex-col items-center justify-center">
+          <h1 className={`text-6xl font-bold mb-8 drop-shadow-xl uppercase ${getTeamTextColor(winner)}`}>{winner} TEAM WINS!</h1>
+          <div className="flex gap-4">
+            <button onClick={handleRestartGame} className="bg-yellow-500 text-black font-bold py-3 px-8 rounded-lg hover:bg-yellow-400 hover:scale-105 transition-transform text-xl">
+              Play Again
+            </button>
+            <button onClick={() => window.location.reload()} className="bg-gray-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-500 transition-colors">
+              Leave Room
+            </button>
+          </div>
         </div>
       )}
 
@@ -197,7 +207,6 @@ export default function SequenceGame() {
           <p className="text-sm md:text-lg">Team: <span className={`font-bold ml-1 ${getTeamTextColor(myTeam)}`}>{myTeam.toUpperCase()}</span></p>
           <div className="w-1 h-6 bg-gray-500 rounded"></div>
           
-          {/* UPDATED TURN HEADER */}
           <p className={`text-sm md:text-lg transition-all ${isMyTurn ? 'animate-pulse text-yellow-300 font-bold' : ''}`}>
             Turn: <span className={`font-bold ml-1 ${getTeamTextColor(currentTurn)}`}>
               {activePlayerName} ({currentTurn.toUpperCase()})
