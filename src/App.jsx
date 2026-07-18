@@ -3,7 +3,7 @@ import io from 'socket.io-client';
 import confetti from 'canvas-confetti';
 import { BOARD_LAYOUT } from './constants';
 
-const socket = io.connect('http://localhost:3001'); 
+const socket = io.connect('https://sequence-server-g51u.onrender.com'); 
 
 const AVATARS = ['😎', '🦊', '🦁', '🦄', '👽', '💀', '🤖', '👑'];
 
