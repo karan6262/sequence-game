@@ -2,15 +2,17 @@ import React, { useState, useEffect } from 'react';
 import io from 'socket.io-client';
 import { BOARD_LAYOUT } from './constants';
 
-const socket = io.connect('https://sequence-server-g51u.onrender.com');
+// Update this to your deployed Render URL if hosting, or keep localhost for local testing
+const socket = io.connect('http://localhost:3001');
 
 export default function SequenceGame() {
   const [appState, setAppState] = useState('lobby');
   const [roomInput, setRoomInput] = useState('');
+  const [playerName, setPlayerName] = useState('');
   const [currentRoom, setCurrentRoom] = useState(null);
 
-  // New state to track live lobby data
-  const [roomInfo, setRoomInfo] = useState({ red: 0, blue: 0, green: 0, total: 0 });
+  // roomInfo now holds arrays of player names instead of just numbers
+  const [roomInfo, setRoomInfo] = useState({ red: [], blue: [], green: [], unassigned: [], total: 0 });
 
   const [boardChips, setBoardChips] = useState(Array(100).fill(null));
   const [currentTurn, setCurrentTurn] = useState('red');
@@ -55,8 +57,8 @@ export default function SequenceGame() {
 
   const handleJoinRoom = (e) => {
     e.preventDefault();
-    if (roomInput.trim() !== '') {
-      socket.emit('join_room', roomInput);
+    if (roomInput.trim() !== '' && playerName.trim() !== '') {
+      socket.emit('join_room', { roomId: roomInput, playerName: playerName.trim() });
     }
   };
 
@@ -115,8 +117,17 @@ export default function SequenceGame() {
       <div className="min-h-screen bg-green-900 text-white flex flex-col items-center justify-center p-4 font-sans">
         <div className="bg-green-800 p-8 rounded-2xl shadow-2xl border-4 border-yellow-500 text-center max-w-md w-full">
           <h1 className="text-5xl font-bold mb-6 tracking-widest text-yellow-400 drop-shadow-md">SEQUENCE</h1>
-          <p className="mb-6 text-gray-200">Enter a Room Code to play!</p>
+          <p className="mb-6 text-gray-200">Enter your name and a Room Code to play!</p>
           <form onSubmit={handleJoinRoom} className="flex flex-col gap-4">
+            <input
+              type="text"
+              placeholder="Your Name"
+              value={playerName}
+              onChange={(e) => setPlayerName(e.target.value)}
+              className="p-3 text-xl text-black rounded-lg focus:outline-none focus:ring-4 focus:ring-yellow-400 text-center font-bold"
+              required
+              maxLength={15}
+            />
             <input
               type="text"
               placeholder="Room Code"
@@ -138,42 +149,68 @@ export default function SequenceGame() {
   if (appState === 'team_select') {
     return (
       <div className="min-h-screen bg-green-900 text-white flex flex-col items-center justify-center p-4 font-sans">
-        <div className="bg-green-800 p-8 rounded-2xl shadow-2xl border-4 border-yellow-500 text-center max-w-lg w-full">
+        <div className="bg-green-800 p-8 rounded-2xl shadow-2xl border-4 border-yellow-500 text-center max-w-2xl w-full">
           <h2 className="text-3xl font-bold mb-2 text-yellow-400">Room: {currentRoom}</h2>
           <div className="mb-8">
             <p className="text-gray-200 text-lg">Choose your team</p>
             <p className="text-yellow-200 text-sm font-bold">Total Players Joined: {roomInfo.total} / 12</p>
           </div>
           
-          <div className="flex flex-col gap-4">
-            <button 
-              onClick={() => handleSelectTeam('red')} 
-              disabled={roomInfo.red >= 4}
-              className={`border-4 text-white font-bold text-xl py-4 rounded-xl shadow-lg transition-transform 
-                ${roomInfo.red >= 4 ? 'bg-gray-600 border-gray-800 opacity-50 cursor-not-allowed' : 'bg-red-600 border-red-800 hover:bg-red-500 hover:scale-105'}
-              `}
-            >
-              JOIN RED TEAM ({roomInfo.red}/4)
-            </button>
-            <button 
-              onClick={() => handleSelectTeam('blue')} 
-              disabled={roomInfo.blue >= 4}
-              className={`border-4 text-white font-bold text-xl py-4 rounded-xl shadow-lg transition-transform 
-                ${roomInfo.blue >= 4 ? 'bg-gray-600 border-gray-800 opacity-50 cursor-not-allowed' : 'bg-blue-600 border-blue-800 hover:bg-blue-500 hover:scale-105'}
-              `}
-            >
-              JOIN BLUE TEAM ({roomInfo.blue}/4)
-            </button>
-            <button 
-              onClick={() => handleSelectTeam('green')} 
-              disabled={roomInfo.green >= 4}
-              className={`border-4 text-white font-bold text-xl py-4 rounded-xl shadow-lg transition-transform 
-                ${roomInfo.green >= 4 ? 'bg-gray-600 border-gray-800 opacity-50 cursor-not-allowed' : 'bg-emerald-600 border-emerald-900 hover:bg-emerald-500 hover:scale-105'}
-              `}
-            >
-              JOIN GREEN TEAM ({roomInfo.green}/4)
-            </button>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Red Team */}
+            <div className="flex flex-col gap-2">
+              <button 
+                onClick={() => handleSelectTeam('red')} 
+                disabled={roomInfo.red.length >= 4}
+                className={`border-4 text-white font-bold text-lg py-3 rounded-xl shadow-lg transition-transform 
+                  ${roomInfo.red.length >= 4 ? 'bg-gray-600 border-gray-800 opacity-50 cursor-not-allowed' : 'bg-red-600 border-red-800 hover:bg-red-500 hover:scale-105'}
+                `}
+              >
+                JOIN RED ({roomInfo.red.length}/4)
+              </button>
+              <div className="bg-red-950 p-2 rounded text-sm text-red-200 min-h-[60px]">
+                {roomInfo.red.length > 0 ? roomInfo.red.join(', ') : 'Waiting for players...'}
+              </div>
+            </div>
+
+            {/* Blue Team */}
+            <div className="flex flex-col gap-2">
+              <button 
+                onClick={() => handleSelectTeam('blue')} 
+                disabled={roomInfo.blue.length >= 4}
+                className={`border-4 text-white font-bold text-lg py-3 rounded-xl shadow-lg transition-transform 
+                  ${roomInfo.blue.length >= 4 ? 'bg-gray-600 border-gray-800 opacity-50 cursor-not-allowed' : 'bg-blue-600 border-blue-800 hover:bg-blue-500 hover:scale-105'}
+                `}
+              >
+                JOIN BLUE ({roomInfo.blue.length}/4)
+              </button>
+              <div className="bg-blue-950 p-2 rounded text-sm text-blue-200 min-h-[60px]">
+                {roomInfo.blue.length > 0 ? roomInfo.blue.join(', ') : 'Waiting for players...'}
+              </div>
+            </div>
+
+            {/* Green Team */}
+            <div className="flex flex-col gap-2">
+              <button 
+                onClick={() => handleSelectTeam('green')} 
+                disabled={roomInfo.green.length >= 4}
+                className={`border-4 text-white font-bold text-lg py-3 rounded-xl shadow-lg transition-transform 
+                  ${roomInfo.green.length >= 4 ? 'bg-gray-600 border-gray-800 opacity-50 cursor-not-allowed' : 'bg-emerald-600 border-emerald-900 hover:bg-emerald-500 hover:scale-105'}
+                `}
+              >
+                JOIN GREEN ({roomInfo.green.length}/4)
+              </button>
+              <div className="bg-emerald-950 p-2 rounded text-sm text-emerald-200 min-h-[60px]">
+                {roomInfo.green.length > 0 ? roomInfo.green.join(', ') : 'Waiting for players...'}
+              </div>
+            </div>
           </div>
+          
+          {roomInfo.unassigned.length > 0 && (
+            <div className="mt-8 pt-4 border-t border-green-700">
+              <p className="text-sm text-gray-400">Players deciding: {roomInfo.unassigned.join(', ')}</p>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -194,10 +231,17 @@ export default function SequenceGame() {
         </div>
       )}
 
+      {/* Roster Bar */}
+      <div className="w-full max-w-4xl bg-green-900 p-2 rounded-lg border border-green-700 mb-4 flex flex-wrap justify-center gap-6 text-xs md:text-sm">
+        <div className="text-red-300"><span className="font-bold text-red-500">RED:</span> {roomInfo.red.join(', ') || '-'}</div>
+        <div className="text-blue-300"><span className="font-bold text-blue-500">BLUE:</span> {roomInfo.blue.join(', ') || '-'}</div>
+        <div className="text-emerald-300"><span className="font-bold text-emerald-500">GREEN:</span> {roomInfo.green.join(', ') || '-'}</div>
+      </div>
+
       <div className="mb-4 text-center w-full max-w-4xl flex flex-col md:flex-row items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-widest text-yellow-400 drop-shadow-md hidden md:block">SEQUENCE</h1>
         
-        <div className="flex gap-4 items-center justify-center bg-green-900 p-3 rounded-lg border-2 border-yellow-500 shadow-md">
+        <div className="flex gap-4 items-center justify-center bg-green-950 p-3 rounded-lg border-2 border-yellow-500 shadow-md">
           <p className="text-sm md:text-lg">Team: <span className={`font-bold ml-1 ${getTeamTextColor(myTeam)}`}>{myTeam.toUpperCase()}</span></p>
           <div className="w-1 h-6 bg-gray-500 rounded"></div>
           <p className="text-sm md:text-lg">Turn: <span className={`font-bold ml-1 ${getTeamTextColor(currentTurn)}`}>{currentTurn.toUpperCase()}</span></p>
