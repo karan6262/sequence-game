@@ -2,9 +2,21 @@ import React, { useState, useEffect } from 'react';
 import io from 'socket.io-client';
 import { BOARD_LAYOUT } from './constants';
 
-const socket = io.connect('https://sequence-server-g51u.onrender.com'); // Update to Render URL for production
+const socket = io.connect('http://localhost:3001'); // Update to Render URL later
+
+// Generate or retrieve a persistent Session ID for reconnects
+const getSessionPlayerId = () => {
+  let pid = sessionStorage.getItem('sequence_playerId');
+  if (!pid) {
+    pid = 'player_' + Math.random().toString(36).substr(2, 9);
+    sessionStorage.setItem('sequence_playerId', pid);
+  }
+  return pid;
+};
 
 export default function SequenceGame() {
+  const [playerId] = useState(getSessionPlayerId());
+  
   const [appState, setAppState] = useState('lobby');
   const [roomInput, setRoomInput] = useState('');
   const [playerName, setPlayerName] = useState('');
@@ -22,10 +34,31 @@ export default function SequenceGame() {
   const [hand, setHand] = useState([]);
   const [selectedCard, setSelectedCard] = useState(null);
 
+  // Auto-Reconnect Logic
   useEffect(() => {
-    socket.on('room_joined', (roomId) => { setCurrentRoom(roomId); setAppState('team_select'); });
+    const savedRoom = sessionStorage.getItem('sequence_room');
+    const savedName = sessionStorage.getItem('sequence_name');
+    
+    if (savedRoom && savedName) {
+      setRoomInput(savedRoom);
+      setPlayerName(savedName);
+      socket.emit('join_room', { roomId: savedRoom, playerName: savedName, playerId: playerId });
+    }
+  }, [playerId]);
+
+  useEffect(() => {
+    socket.on('room_joined', (roomId) => { 
+      setCurrentRoom(roomId); 
+      setAppState('team_select'); 
+    });
+    
     socket.on('room_info', (info) => setRoomInfo(info));
-    socket.on('assigned_team', (color) => { setMyTeam(color); setAppState('game'); });
+    
+    socket.on('assigned_team', (color) => { 
+      setMyTeam(color); 
+      setAppState('game'); 
+    });
+    
     socket.on('game_state', (gameState) => {
       setBoardChips(gameState.board);
       setCurrentTurn(gameState.turn);
@@ -33,24 +66,40 @@ export default function SequenceGame() {
       setActivePlayerName(gameState.activePlayerName);
       setWinner(gameState.winner);
     });
+    
     socket.on('your_hand', (dealtHand) => setHand(dealtHand));
+    
+    socket.on('game_restarted', (allHands) => {
+      // Pick out this specific player's new hand from the bulk broadcast
+      if (allHands[playerId]) {
+        setHand(allHands[playerId]);
+        setSelectedCard(null);
+      }
+    });
+
     socket.on('error_message', (msg) => alert(msg));
     
     return () => {
       socket.off('room_joined'); socket.off('room_info'); socket.off('assigned_team');
-      socket.off('game_state'); socket.off('your_hand'); socket.off('error_message');
+      socket.off('game_state'); socket.off('your_hand'); socket.off('game_restarted'); socket.off('error_message');
     };
-  }, []);
+  }, [playerId]);
 
   const handleJoinRoom = (e) => {
     e.preventDefault();
-    if (roomInput.trim() && playerName.trim()) socket.emit('join_room', { roomId: roomInput, playerName: playerName.trim() });
+    if (roomInput.trim() && playerName.trim()) {
+      sessionStorage.setItem('sequence_room', roomInput.trim());
+      sessionStorage.setItem('sequence_name', playerName.trim());
+      socket.emit('join_room', { roomId: roomInput.trim(), playerName: playerName.trim(), playerId: playerId });
+    }
   };
 
-  const handleSelectTeam = (color) => socket.emit('join_team', { roomId: currentRoom, teamColor: color });
+  const handleSelectTeam = (color) => {
+    socket.emit('join_team', { roomId: currentRoom, teamColor: color, playerId: playerId });
+  };
 
   const handleCellClick = (index) => {
-    if (winner || socket.id !== activePlayerId) return;
+    if (winner || playerId !== activePlayerId) return;
     if (!selectedCard) return alert("Select a card from your hand first.");
     
     const targetSpace = BOARD_LAYOUT[index];
@@ -63,12 +112,17 @@ export default function SequenceGame() {
     if (isOneEyed && (boardChips[index] === null || boardChips[index] === myTeam)) return;
     if (!isTwoEyed && !isOneEyed && (boardChips[index] !== null || selectedCard !== targetSpace)) return;
 
-    socket.emit('place_chip', { roomId: currentRoom, index, teamColor: myTeam, playedCard: selectedCard });
+    socket.emit('place_chip', { roomId: currentRoom, index, teamColor: myTeam, playedCard: selectedCard, playerId: playerId });
     setHand(hand.filter(card => card !== selectedCard));
     setSelectedCard(null);
   };
 
   const handleRestartGame = () => socket.emit('restart_game', currentRoom);
+
+  const handleDisconnect = () => {
+    sessionStorage.clear();
+    window.location.reload();
+  };
 
   // Theme Helpers
   const getCardColor = (card) => (card.includes('♥') || card.includes('♦') ? 'text-rose-600' : 'text-slate-900');
@@ -158,11 +212,10 @@ export default function SequenceGame() {
   }
 
   // ================= GAME UI =================
-  const isMyTurn = socket.id === activePlayerId;
+  const isMyTurn = playerId === activePlayerId;
 
   return (
     <div className={layoutContainer}>
-      {/* Background glow syncing with turn */}
       <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-[60vh] rounded-full blur-[150px] pointer-events-none opacity-10 transition-colors duration-1000
         ${currentTurn === 'red' ? 'bg-rose-500' : currentTurn === 'blue' ? 'bg-cyan-500' : 'bg-emerald-500'}
       `}></div>
@@ -172,18 +225,16 @@ export default function SequenceGame() {
           <h1 className={`text-5xl sm:text-7xl font-black mb-10 tracking-[0.2em] ${getTeamNeon(winner)}`}>{winner} WINS</h1>
           <div className="flex gap-6">
             <button onClick={handleRestartGame} className="bg-white text-black font-black py-4 px-8 rounded-xl hover:scale-105 transition-all shadow-[0_0_20px_rgba(255,255,255,0.3)]">PLAY AGAIN</button>
-            <button onClick={() => window.location.reload()} className="bg-transparent border border-white/20 text-white font-bold py-4 px-8 rounded-xl hover:bg-white/10 transition-all">DISCONNECT</button>
+            <button onClick={handleDisconnect} className="bg-transparent border border-white/20 text-white font-bold py-4 px-8 rounded-xl hover:bg-white/10 transition-all">LEAVE ROOM</button>
           </div>
         </div>
       )}
 
       <div className="w-full max-w-7xl mx-auto flex flex-col h-full z-10 pt-2 sm:pt-4">
         
-        {/* Top Header Bar */}
         <div className="flex items-center justify-between bg-white/[0.03] border border-white/10 p-3 sm:p-5 rounded-2xl mb-4 sm:mb-6 backdrop-blur-md shadow-xl">
           <div className="hidden md:block text-2xl font-black tracking-[0.3em] text-white">SEQ<span className="text-slate-500">UENCE</span></div>
           
-          {/* Turn Indicator */}
           <div className="flex-1 flex justify-center">
             <div className={`flex items-center gap-3 px-6 py-2 rounded-full border ${isMyTurn ? 'border-white/50 bg-white/10 shadow-[0_0_20px_rgba(255,255,255,0.1)]' : 'border-white/10 bg-black/40'} transition-all`}>
               <div className="text-xs sm:text-sm font-medium text-slate-400 tracking-widest uppercase">Target:</div>
@@ -193,18 +244,19 @@ export default function SequenceGame() {
             </div>
           </div>
 
-          <div className="hidden md:flex items-center gap-2">
-            <div className="text-xs font-bold text-slate-400 tracking-widest">SQUAD:</div>
-            <div className={`text-sm font-black tracking-widest ${getTeamNeon(myTeam)}`}>{myTeam.toUpperCase()}</div>
+          <div className="hidden md:flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className="text-xs font-bold text-slate-400 tracking-widest">SQUAD:</div>
+              <div className={`text-sm font-black tracking-widest ${getTeamNeon(myTeam)}`}>{myTeam.toUpperCase()}</div>
+            </div>
+            <button onClick={handleDisconnect} className="text-xs border border-white/20 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded transition-colors text-white">LEAVE</button>
           </div>
         </div>
 
-        {/* Dynamic Board Container */}
         <div className="flex-1 w-full flex items-center justify-center mb-4 sm:mb-6">
           <div className={`w-full max-w-xs sm:max-w-2xl md:max-w-3xl lg:max-w-4xl p-2 sm:p-4 rounded-2xl sm:rounded-[2rem] border transition-all duration-500 shadow-2xl backdrop-blur-sm
             ${isMyTurn ? 'bg-white/[0.05] border-white/30 shadow-[0_0_40px_rgba(255,255,255,0.1)]' : 'bg-black/40 border-white/10'}
           `}>
-            {/* 10x10 Grid */}
             <div className="grid grid-cols-10 gap-0.5 sm:gap-1 lg:gap-1.5 w-full">
               {BOARD_LAYOUT.map((cardValue, index) => {
                 const isCorner = cardValue === 'FREE';
@@ -253,7 +305,6 @@ export default function SequenceGame() {
           </div>
         </div>
 
-        {/* Hand Area (Overlapping Cards Effect) */}
         <div className="w-full pb-4 sm:pb-8 flex flex-col items-center">
           <p className={`text-xs sm:text-sm font-bold tracking-[0.2em] mb-4 sm:mb-6 transition-colors ${isMyTurn ? 'text-white' : 'text-slate-500'}`}>
             {isMyTurn ? "DEPLOY ASSET" : "STANDBY"}
@@ -274,7 +325,6 @@ export default function SequenceGame() {
                 >
                   <span className={`font-black text-xl sm:text-3xl lg:text-4xl drop-shadow-sm ${getCardColor(card)}`}>{card}</span>
                   
-                  {/* Wild Indicators */}
                   {(card === 'J♦' || card === 'J♣') && (
                     <span className="absolute bottom-1 sm:bottom-2 bg-emerald-500 text-black text-[6px] sm:text-[10px] font-black px-1.5 sm:px-2 py-0.5 rounded shadow-sm tracking-widest">WILD</span>
                   )}
