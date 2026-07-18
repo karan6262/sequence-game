@@ -3,7 +3,7 @@ import io from 'socket.io-client';
 import confetti from 'canvas-confetti';
 import { BOARD_LAYOUT } from './constants';
 
-const socket = io.connect('https://sequence-server-g51u.onrender.com'); 
+const socket = io.connect('https://sequence-server-g51u.onrender.com'); // Update to Render URL
 
 const AVATARS = ['😎', '🦊', '🦁', '🦄', '👽', '💀', '🤖', '👑'];
 
@@ -21,7 +21,6 @@ const getSessionPlayerId = () => {
 export default function SequenceGame() {
   const [playerId] = useState(getSessionPlayerId());
   
-  // Customization
   const [theme, setTheme] = useState(localStorage.getItem('seq_theme') || 'cyber');
   const [avatar, setAvatar] = useState('😎');
   
@@ -39,6 +38,8 @@ export default function SequenceGame() {
   const [activePlayerId, setActivePlayerId] = useState(null);
   const [activePlayerName, setActivePlayerName] = useState('Waiting...');
   const [timeLeft, setTimeLeft] = useState(60);
+
+  const [hostId, setHostId] = useState(null); // NEW: Track the Host
 
   const [myTeam, setMyTeam] = useState('');
   const [hand, setHand] = useState([]);
@@ -77,6 +78,7 @@ export default function SequenceGame() {
       setIsGameStarted(gameState.isGameStarted || false);
       setWinner(gameState.winner); 
       setWinningLine(gameState.winningLine || []);
+      setHostId(gameState.hostId);
 
       if (gameState.winner && !winner) {
         playSound('win');
@@ -216,21 +218,45 @@ export default function SequenceGame() {
   return (
     <div className={`min-h-[100dvh] ${t.bg} text-white flex flex-col md:flex-row p-2 sm:p-4 gap-4 overflow-hidden font-sans relative`}>
       
+      {/* WAITING TO START OVERLAY (Updated Logic) */}
       {!isGameStarted && !winner && (
-        <div className="absolute inset-0 z-40 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center animate-in fade-in duration-500">
-          <h2 className="text-3xl sm:text-5xl font-black text-white mb-2 tracking-widest text-center">WAITING FOR OPERATIVES</h2>
-          <p className="text-slate-300 mb-8 font-bold tracking-widest">Players: {roomInfo.total}</p>
-          <button onClick={() => socket.emit('start_game', currentRoom)} className="bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-black py-4 px-12 rounded-2xl shadow-[0_0_30px_rgba(34,211,238,0.4)] hover:scale-110 transition-transform text-2xl">
-            START MATCH
-          </button>
+        <div className="absolute inset-0 z-40 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center animate-in fade-in duration-500">
+          <h2 className={`text-4xl sm:text-6xl font-black mb-4 tracking-widest text-center ${getTeamNeon(myTeam)}`}>
+            {myTeam.toUpperCase()} SQUAD DEPLOYED
+          </h2>
+
+          {playerId === hostId ? (
+            <>
+              <p className="text-slate-300 mb-8 font-bold tracking-widest text-center">
+                You are the Room Host.<br/> Players in Room: {roomInfo.total} / 12
+              </p>
+              
+              <div className="flex gap-4 mb-8">
+                {['red', 'blue', 'green'].map(color => (
+                  <button key={color} onClick={() => socket.emit('add_bot', {roomId: currentRoom, teamColor: color})} disabled={roomInfo[color]?.length >= 4} className="border border-white/20 px-4 py-2 rounded-lg font-bold text-xs hover:bg-white/10 transition-colors uppercase bg-black/40">
+                    + Add Bot to {color}
+                  </button>
+                ))}
+              </div>
+
+              <button onClick={() => socket.emit('start_game', currentRoom)} className="bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-black py-4 px-12 rounded-2xl shadow-[0_0_30px_rgba(34,211,238,0.4)] hover:scale-110 transition-transform text-2xl">
+                START MATCH
+              </button>
+            </>
+          ) : (
+            <p className="text-slate-300 mb-8 text-xl font-bold tracking-widest animate-pulse">
+              Waiting for Host to configure and start the match...
+            </p>
+          )}
         </div>
       )}
 
+      {/* GAME OVER OVERLAY */}
       {winner && (
         <div className="absolute inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center animate-in fade-in duration-300">
           <h1 className={`text-6xl sm:text-8xl font-black mb-10 tracking-[0.2em] ${getTeamNeon(winner)}`}>{winner.toUpperCase()} WINS</h1>
           <div className="flex gap-6">
-            <button onClick={handleRestartGame} className="bg-white text-black font-black py-4 px-8 rounded-xl hover:scale-105 transition-all shadow-[0_0_20px_rgba(255,255,255,0.3)]">PLAY AGAIN</button>
+            <button onClick={() => socket.emit('restart_game', currentRoom)} className="bg-white text-black font-black py-4 px-8 rounded-xl hover:scale-105 transition-all shadow-[0_0_20px_rgba(255,255,255,0.3)]">PLAY AGAIN</button>
             <button onClick={handleDisconnect} className="bg-transparent border border-white/20 text-white font-bold py-4 px-8 rounded-xl hover:bg-white/10 transition-all">LEAVE ROOM</button>
           </div>
         </div>
