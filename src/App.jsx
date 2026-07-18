@@ -3,7 +3,7 @@ import io from 'socket.io-client';
 import { BOARD_LAYOUT } from './constants';
 
 // Update this to your deployed Render URL if hosting, or keep localhost for local testing
-const socket = io.connect('http://localhost:3001');
+const socket = io.connect('https://sequence-server-g51u.onrender.com');
 
 export default function SequenceGame() {
   const [appState, setAppState] = useState('lobby');
