@@ -39,7 +39,8 @@ export default function SequenceGame() {
   const [activePlayerName, setActivePlayerName] = useState('Waiting...');
   const [timeLeft, setTimeLeft] = useState(60);
 
-  const [hostId, setHostId] = useState(null); 
+  const [hostId, setHostId] = useState(null);
+  const [turnDeadline, setTurnDeadline] = useState(0); 
 
   const [myTeam, setMyTeam] = useState('');
   const [hand, setHand] = useState([]);
@@ -70,15 +71,16 @@ export default function SequenceGame() {
     
     socket.on('game_state', (gameState) => {
       if(!gameState) return;
-      setBoardChips(gameState.board || Array(100).fill(null)); 
+      setBoardChips(gameState.board || Array(100).fill(null));
       setCurrentTurn(gameState.turn || 'red');
-      setActivePlayerId(gameState.activePlayerId); 
+      setActivePlayerId(gameState.activePlayerId);
       setActivePlayerName(gameState.activePlayerName || 'Waiting...');
-      setLogs(gameState.logs || []); 
+      setLogs(gameState.logs || []);
       setIsGameStarted(gameState.isGameStarted || false);
-      setWinner(gameState.winner); 
+      setWinner(gameState.winner);
       setWinningLine(gameState.winningLine || []);
       setHostId(gameState.hostId);
+      setTurnDeadline(gameState.turnDeadline);
 
       if (gameState.winner && !winner) {
         playSound('win');
