@@ -15,14 +15,20 @@ const playSound = (type) => {
 export default function SequenceGame() {
 
   const [avatar, setAvatar] = useState('😎');
-  const [playerId] = useState(() => {
-    let pid = sessionStorage.getItem('sequence_playerId');
-    if (!pid) {
-      pid = 'player_' + Math.random().toString(36).substr(2, 9);
-      sessionStorage.setItem('sequence_playerId', pid);
-    }
-    return pid;
-  });
+  const [playerId, setPlayerId] = useState(null);
+
+  useEffect(() => {
+    const initializePlayerId = () => {
+      let pid = sessionStorage.getItem('sequence_playerId');
+      if (!pid) {
+        pid = 'player_' + Math.random().toString(36).substr(2, 9);
+        sessionStorage.setItem('sequence_playerId', pid);
+      }
+      setPlayerId(pid);
+    };
+
+    initializePlayerId();
+  }, []);
 
   const [appState, setAppState] = useState('lobby');
   const [roomInput, setRoomInput] = useState('');
