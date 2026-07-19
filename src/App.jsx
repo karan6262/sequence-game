@@ -173,21 +173,46 @@ export default function SequenceGame() {
 
   // THEME ENGINE
   const t = {
-    bg: theme === 'cyber' ? "bg-[#0a0f1a] bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" : "bg-[#2d1b11] bg-[url('https://www.transparenttextures.com/patterns/wood-pattern.png')]",
-    card: theme === 'cyber' ? "bg-slate-200 shadow-xl" : "bg-[#f5deb3] shadow-[2px_2px_5px_rgba(0,0,0,0.5)] border-[#8b4513]",
-    boardBg: theme === 'cyber' ? "bg-white/[0.05] border-white/30" : "bg-[#5c3a21] border-[#3e2723] shadow-inner",
-    freeCell: theme === 'cyber' ? "bg-amber-400" : "bg-yellow-600 border border-yellow-800",
-    regCell: theme === 'cyber' ? "bg-slate-200" : "bg-[#e8d5b5] border border-[#a0522d]",
+    bg: theme === 'cyber'
+      ? "bg-[#0f172a] bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-[linear-gradient(180deg,rgba(15,23,42,0.9)_0%,rgba(10,15,26,0.7)_100%)]"
+      : "bg-[#2d1b11] bg-[url('https://www.transparenttextures.com/patterns/wood-pattern.png')] bg-[linear-gradient(180deg,rgba(45,27,17,0.9)_0%,rgba(30,18,10,0.7)_100%)]",
+    card: theme === 'cyber'
+      ? "bg-white/10 backdrop-blur-md border border-white/20 shadow-lg hover:shadow-xl transition-shadow duration-300"
+      : "bg-[#f5deb3]/80 backdrop-blur-sm border border-[#8b4513]/50 shadow-lg hover:shadow-xl transition-shadow duration-300",
+    boardBg: theme === 'cyber'
+      ? "bg-white/5 backdrop-blur-sm border border-white/10"
+      : "bg-[#5c3a21]/80 backdrop-blur-sm border border-[#3e2723]/50",
+    freeCell: theme === 'cyber'
+      ? "bg-amber-300/30 backdrop-blur-sm border border-amber-400/50"
+      : "bg-[#d4af37]/80 backdrop-blur-sm border border-[#b8860b]/50",
+    regCell: theme === 'cyber'
+      ? "bg-white/5 backdrop-blur-sm border border-white/10"
+      : "bg-[#e8d5b5]/80 backdrop-blur-sm border border-[#a0522d]/30",
   };
 
-  const getTeamNeon = (team) => team === 'red' ? 'text-rose-400 drop-shadow-[0_0_8px_rgba(244,63,94,0.8)]' : team === 'blue' ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]' : team === 'green' ? 'text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]' : 'text-slate-400';
-  
+  const getTeamNeon = (team) =>
+    team === 'red'
+      ? 'text-rose-400 drop-shadow-[0_0_8px_rgba(244,63,94,0.6)]'
+      : team === 'blue'
+        ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]'
+        : team === 'green'
+          ? 'text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.6)]'
+          : 'text-slate-400';
+
   const getChipStyle = (color, isWin) => {
-    const cyberColors = color === 'red' ? 'from-rose-400 to-rose-900 ring-rose-300' : color === 'blue' ? 'from-cyan-400 to-cyan-900 ring-cyan-300' : 'from-emerald-400 to-emerald-900 ring-emerald-300';
-    const woodColors = color === 'red' ? 'from-red-600 to-red-800 ring-red-900' : color === 'blue' ? 'from-blue-600 to-blue-800 ring-blue-900' : 'from-green-600 to-green-800 ring-green-900';
+    const cyberColors = color === 'red'
+      ? 'from-rose-400 to-rose-900 ring-rose-300/50 drop-shadow-[0_0_8px_rgba(244,63,94,0.4)]'
+      : color === 'blue'
+        ? 'from-cyan-400 to-cyan-900 ring-cyan-300/50 drop-shadow-[0_0_8px_rgba(34,211,238,0.4)]'
+        : 'from-emerald-400 to-emerald-900 ring-emerald-300/50 drop-shadow-[0_0_8px_rgba(52,211,153,0.4)]';
+    const woodColors = color === 'red'
+      ? 'from-red-600 to-red-800 ring-red-900/50 drop-shadow-[0_0_4px_rgba(139,69,19,0.3)]'
+      : color === 'blue'
+        ? 'from-blue-600 to-blue-800 ring-blue-900/50 drop-shadow-[0_0_4px_rgba(0,0,0,0.2)]'
+        : 'from-green-600 to-green-800 ring-green-900/50 drop-shadow-[0_0_4px_rgba(34,139,34,0.3)]';
     const base = theme === 'cyber' ? cyberColors : woodColors;
-    
-    return `bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] ${base} shadow-[inset_0_2px_4px_rgba(255,255,255,0.4)] ring-1 ${isWin ? 'animate-bounce ring-4 shadow-[0_0_30px_rgba(255,255,255,1)] brightness-150' : ''}`;
+
+    return `bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] ${base} shadow-[inset_0_2px_4px_rgba(255,255,255,0.2)] ring-1/20 ${isWin ? 'animate-bounce ring-4/30 shadow-[0_0_20px_rgba(255,255,255,0.6)]' : ''}`;
   };
 
   const layoutContainer = `min-h-[100dvh] w-full ${t.bg} text-white flex flex-col items-center justify-center p-2 sm:p-6 overflow-hidden font-sans`;
