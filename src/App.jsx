@@ -12,15 +12,17 @@ const playSound = (type) => {
   if (sounds[type] && sounds[type].src) sounds[type].play().catch(() => {});
 };
 
-const getSessionPlayerId = () => {
-  let pid = sessionStorage.getItem('sequence_playerId');
-  if (!pid) { pid = 'player_' + Math.random().toString(36).substr(2, 9); sessionStorage.setItem('sequence_playerId', pid); }
-  return pid;
-};
-
 export default function SequenceGame() {
 
   const [avatar, setAvatar] = useState('😎');
+  const [playerId] = useState(() => {
+    let pid = sessionStorage.getItem('sequence_playerId');
+    if (!pid) {
+      pid = 'player_' + Math.random().toString(36).substr(2, 9);
+      sessionStorage.setItem('sequence_playerId', pid);
+    }
+    return pid;
+  });
 
   const [appState, setAppState] = useState('lobby');
   const [roomInput, setRoomInput] = useState('');
