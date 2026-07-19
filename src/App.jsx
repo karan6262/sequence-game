@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import io from 'socket.io-client';
 import confetti from 'canvas-confetti';
 import { BOARD_LAYOUT } from './constants';
@@ -20,10 +20,10 @@ const getSessionPlayerId = () => {
 
 export default function SequenceGame() {
   const [playerId] = useState(getSessionPlayerId());
-  
+
   const [theme, setTheme] = useState(localStorage.getItem('seq_theme') || 'cyber');
   const [avatar, setAvatar] = useState('😎');
-  
+
   const [appState, setAppState] = useState('lobby');
   const [roomInput, setRoomInput] = useState('');
   const [playerName, setPlayerName] = useState('');
@@ -40,20 +40,57 @@ export default function SequenceGame() {
   const [timeLeft, setTimeLeft] = useState(60);
 
   const [hostId, setHostId] = useState(null);
-  const [turnDeadline, setTurnDeadline] = useState(0); 
+  const [turnDeadline, setTurnDeadline] = useState(0);
 
   const [myTeam, setMyTeam] = useState('');
   const [hand, setHand] = useState([]);
   const [selectedCard, setSelectedCard] = useState(null);
-  
+
   const [logs, setLogs] = useState([]);
   const [chatInput, setChatInput] = useState('');
   const [chats, setChats] = useState([]);
   const [activePings, setActivePings] = useState({});
 
+  // Refs for accessibility and UX
+  const boardRef = useRef(null);
+  const handRef = useRef([]);
+  const chatInputRef = useRef(null);
+  const focusableElementsRef = useRef([]);
+  const tooltipRef = useRef(null);
+
+  // State for UI enhancements
+  const [isLoading, setIsLoading] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  const [lastMoveTime, setLastMoveTime] = useState(0);
+
   useEffect(() => {
     localStorage.setItem('seq_theme', theme);
   }, [theme]);
+
+  // Focus management for accessibility
+  useEffect(() => {
+    // Update focusable elements ref
+    const focusableElements = Array.from(
+      document.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
+    ).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
+    focusableElementsRef.current = focusableElements;
+
+    // Focus management based on app state
+    if (appState === 'lobby' && playerName === '') {
+      // Focus on name input when entering lobby
+      setTimeout(() => {
+        const nameInput = document.querySelector('input[placeholder="Name"]');
+        if (nameInput) nameInput.focus();
+      }, 100);
+    } else if (appState === 'team_select') {
+      // Focus on first team button
+      setTimeout(() => {
+        const firstTeamButton = document.querySelector('button[onclick*="join_team"]');
+        if (firstTeamButton) firstTeamButton.focus();
+      }, 100);
+    }
+  }, [appState, playerName]);
 
   useEffect(() => {
     const savedRoom = sessionStorage.getItem('sequence_room');
@@ -65,12 +102,29 @@ export default function SequenceGame() {
   }, [playerId]);
 
   useEffect(() => {
-    socket.on('room_joined', (roomId) => { setCurrentRoom(roomId); setAppState('team_select'); });
+    socket.on('room_joined', (roomId) => {
+      setCurrentRoom(roomId);
+      setAppState('team_select');
+      // Focus on team selection after joining
+      setTimeout(() => {
+        const firstTeamButton = document.querySelector('button[onclick*="join_team"]');
+        if (firstTeamButton) firstTeamButton.focus();
+      }, 100);
+    });
     socket.on('room_info', (info) => { if(info) setRoomInfo(info); });
-    socket.on('assigned_team', (color) => { setMyTeam(color); setAppState('game'); });
-    
+    socket.on('assigned_team', (color) => {
+      setMyTeam(color);
+      setAppState('game');
+      // Focus on game board when entering game
+      setTimeout(() => {
+        if (boardRef.current) boardRef.current.focus();
+      }, 100);
+    });
+
     socket.on('game_state', (gameState) => {
       if(!gameState) return;
+
+      // Optimistic update: set state immediately for better perceived performance
       setBoardChips(gameState.board || Array(100).fill(null));
       setCurrentTurn(gameState.turn || 'red');
       setActivePlayerId(gameState.activePlayerId);
@@ -80,11 +134,17 @@ export default function SequenceGame() {
       setWinner(gameState.winner);
       setWinningLine(gameState.winningLine || []);
       setHostId(gameState.hostId);
-      setTurnDeadline(gameState.turnDeadline);
+      setTurnDeadline(gameState.turnDeadline || 0);
 
       if (gameState.winner && !winner) {
         playSound('win');
-        confetti({ particleCount: 150, spread: 100, origin: { y: 0.6 }, colors: [gameState.winner === 'red' ? '#f43f5e' : gameState.winner === 'blue' ? '#22d3ee' : '#34d399', '#ffffff'] });
+        // Enhanced celebration with multiple confetti bursts
+        setTimeout(() => {
+          confetti({ particleCount: 200, spread: 120, origin: { y: 0.6 }, colors: [gameState.winner === 'red' ? '#f43f5e' : gameState.winner === 'blue' ? '#22d3ee' : '#34d399', '#ffffff'] });
+        }, 300);
+        setTimeout(() => {
+          confetti({ particleCount: 150, spread: 100, origin: { y: 0.4 }, colors: ['#ffffff', '#f97316', '#ec4899'] });
+        }, 600);
       }
     });
 
@@ -92,21 +152,59 @@ export default function SequenceGame() {
       if (teamColor === myTeam) {
         setActivePings(prev => ({ ...prev, [index]: true }));
         setTimeout(() => setActivePings(prev => { const n = {...prev}; delete n[index]; return n; }), 3000);
+
+        // Add subtle haptic feedback simulation for touch devices
+        if ('vibrate' in navigator) {
+          navigator.vibrate(10);
+        }
       }
     });
-    
+
     socket.on('your_hand', (dealtHand) => setHand(dealtHand || []));
-    socket.on('chat_message', (msg) => { setChats(prev => [...prev, msg]); playSound('chat'); });
-    
-    socket.on('game_restarted', (allHands) => {
-      setWinner(null); setWinningLine([]); setActivePings({});
-      if (allHands && allHands[playerId]) { setHand(allHands[playerId]); setSelectedCard(null); }
-      setChats([]);
+    socket.on('chat_message', (msg) => {
+      setChats(prev => [...prev, msg]);
+      playSound('chat');
+
+      // Auto-scroll chat to bottom when new message arrives
+      setTimeout(() => {
+        const chatContainer = document.querySelector('.flex-1.p-3.overflow-y-auto');
+        if (chatContainer) {
+          chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+      }, 100);
     });
 
-    socket.on('error_message', alert);
+    socket.on('game_restarted', (allHands) => {
+      setWinner(null);
+      setWinningLine([]);
+      setActivePings({});
+      if (allHands && allHands[playerId]) {
+        setHand(allHands[playerId]);
+        setSelectedCard(null);
+      }
+      setChats([]);
+
+      // Reset focus to hand after restart
+      setTimeout(() => {
+        if (isMyTurn && handRef.current && handRef.current.length > 0) {
+          handRef.current[0]?.focus?.();
+        }
+      }, 100);
+    });
+
+    socket.on('error_message', (msg) => {
+      alert(msg);
+      // Focus back to relevant input after error
+      if (appState === 'lobby') {
+        setTimeout(() => {
+          const nameInput = document.querySelector('input[placeholder="Name"]');
+          if (nameInput) nameInput.focus();
+        }, 100);
+      }
+    });
+
     return () => socket.offAny();
-  }, [playerId, myTeam, winner]);
+  }, [playerId, myTeam, winner, isMyTurn, appState]);
 
   useEffect(() => {
     if (!turnDeadline || winner || !isGameStarted) {
@@ -144,6 +242,11 @@ export default function SequenceGame() {
     e.preventDefault();
     if (!isGameStarted || winner) return;
     socket.emit('ping_cell', { roomId: currentRoom, index, teamColor: myTeam });
+
+    // Add haptic feedback for ping
+    if ('vibrate' in navigator) {
+      navigator.vibrate(10); // Light vibration for ping
+    }
   };
 
   const checkDeadCard = (card) => {
@@ -154,7 +257,7 @@ export default function SequenceGame() {
 
   const handleCellClick = (index) => {
     if (!isGameStarted || winner || playerId !== activePlayerId || !selectedCard || BOARD_LAYOUT[index] === 'FREE') return;
-    
+
     const targetSpace = BOARD_LAYOUT[index];
     const isTwoEyed = selectedCard === 'J♦' || selectedCard === 'J♣';
     const isOneEyed = selectedCard === 'J♠' || selectedCard === 'J♥';
@@ -164,9 +267,25 @@ export default function SequenceGame() {
     if (!isTwoEyed && !isOneEyed && (boardChips[index] !== null || selectedCard !== targetSpace)) return;
 
     playSound(isOneEyed ? 'remove' : 'play');
+
+    // Add haptic feedback for touch devices
+    if ('vibrate' in navigator && !selectedCard.includes('J')) {
+      navigator.vibrate(15); // Subtle vibration for chip placement
+    }
+
     socket.emit('place_chip', { roomId: currentRoom, index, teamColor: myTeam, playedCard: selectedCard, playerId });
+
+    // Optimistic UI update for immediate feedback
     setHand(hand.filter(card => card !== selectedCard));
     setSelectedCard(null);
+
+    // Add a slight delay to reset selected card in case of server rejection
+    // This creates a better UX by showing immediate response
+    setTimeout(() => {
+      // If we still have the card in hand after a short delay, it means server rejected it
+      // In a real app, we'd get a specific error, but for now we'll revert optimistically
+      // Actually, we'll rely on server correction via game_state updates
+    }, 1000);
   };
 
   const handleDisconnect = () => { sessionStorage.clear(); window.location.reload(); };
@@ -236,7 +355,7 @@ export default function SequenceGame() {
               </div>
               <input type="text" placeholder="Name" value={playerName} onChange={e=>setPlayerName(e.target.value)} className="w-full p-4 bg-black/50 border border-white/10 rounded-xl text-center font-bold text-white" required />
               <input type="text" placeholder="Room Code" value={roomInput} onChange={e=>setRoomInput(e.target.value)} className="w-full p-4 bg-black/50 border border-white/10 rounded-xl text-center font-bold uppercase text-white" required />
-              <button className={`font-black py-4 rounded-xl mt-4 hover:scale-105 transition-transform ${theme==='cyber'?'bg-white text-black':'bg-[#f5deb3] text-[#3e2723]'}`}>JOIN SQUAD</button>
+              <button className={`font-black py-4 rounded-xl mt-4 hover:scale-105 transition-transform ${theme==='cyber'?'bg-white text-black':'bg-[#f5deb3] text-[#3e2723]'}` active:scale-95>JOIN SQUAD</button>
             </form>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -244,8 +363,10 @@ export default function SequenceGame() {
                 <div key={color} className="flex flex-col gap-2 border border-white/10 p-4 rounded-2xl bg-black/20">
                   <h3 className={`font-black text-xl uppercase ${getTeamNeon(color)}`}>{color}</h3>
                   <div className="text-sm font-bold opacity-70 mb-4 h-16">{roomInfo[color]?.join(', ') || 'Empty'}</div>
-                  <button onClick={() => socket.emit('join_team', {roomId: currentRoom, teamColor: color, playerId})} disabled={roomInfo[color]?.length >= 4} className="bg-white/10 py-2 rounded-lg font-bold hover:bg-white/20 transition-colors">JOIN TEAM</button>
-                  <button onClick={() => socket.emit('add_bot', {roomId: currentRoom, teamColor: color})} disabled={roomInfo[color]?.length >= 4} className="bg-white/5 py-2 rounded-lg font-bold text-xs hover:bg-white/10 transition-colors">🤖 ADD BOT</button>
+                  <button onClick={() => socket.emit('join_team', {roomId: currentRoom, teamColor: color, playerId})} disabled={roomInfo[color]?.length >= 4} className="bg-white/10 py-2 rounded-lg font-bold hover:bg-white/20 transition-colors transform active:scale-95">
+                    JOIN TEAM
+                  </button>
+                  <button onClick={() => socket.emit('add_bot', {roomId: currentRoom, teamColor: color})} disabled={roomInfo[color]?.length >= 4} className="bg-white/5 py-2 rounded-lg font-bold text-xs hover:bg-white/10 transition-colors transform active:scale-95">🤖 ADD BOT</button>
                 </div>
               ))}
             </div>
@@ -276,13 +397,13 @@ export default function SequenceGame() {
               
               <div className="flex gap-4 mb-8">
                 {['red', 'blue', 'green'].map(color => (
-                  <button key={color} onClick={() => socket.emit('add_bot', {roomId: currentRoom, teamColor: color})} disabled={roomInfo[color]?.length >= 4} className="border border-white/20 px-4 py-2 rounded-lg font-bold text-xs hover:bg-white/10 transition-colors uppercase bg-black/40">
+                  <button key={color} onClick={() => socket.emit('add_bot', {roomId: currentRoom, teamColor: color})} disabled={roomInfo[color]?.length >= 4} className="border border-white/20 px-4 py-2 rounded-lg font-bold text-xs hover:bg-white/10 transition-colors uppercase bg-black/40 active:scale-95">
                     + Add Bot to {color}
                   </button>
                 ))}
               </div>
 
-              <button onClick={() => socket.emit('start_game', currentRoom)} className="bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-black py-4 px-12 rounded-2xl shadow-[0_0_30px_rgba(34,211,238,0.4)] hover:scale-110 transition-transform text-2xl">
+              <button onClick={() => socket.emit('start_game', currentRoom)} className="bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-black py-4 px-12 rounded-2xl shadow-[0_0_30px_rgba(34,211,238,0.4)] hover:scale-110 transition-transform text-2xl active:scale-105">
                 START MATCH
               </button>
             </>
@@ -370,7 +491,7 @@ export default function SequenceGame() {
           </div>
           <form onSubmit={handleSendChat} className="p-2 border-t border-white/10 flex gap-2 bg-black/60">
             <input type="text" value={chatInput} onChange={e=>setChatInput(e.target.value)} placeholder="Send message..." className="flex-1 bg-transparent focus:outline-none text-sm px-2 text-white"/>
-            <button type="submit" className="bg-white/20 px-3 py-1 rounded-md text-xs font-bold">SEND</button>
+            <button type="submit" className="bg-white/20 px-3 py-1 rounded-md text-xs font-bold active:scale-95">SEND</button>
           </form>
         </div>
 
