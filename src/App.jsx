@@ -15,20 +15,7 @@ const playSound = (type) => {
 export default function SequenceGame() {
 
   const [avatar, setAvatar] = useState('😎');
-  const [playerId, setPlayerId] = useState(null);
-
-  useEffect(() => {
-    const initializePlayerId = () => {
-      let pid = sessionStorage.getItem('sequence_playerId');
-      if (!pid) {
-        pid = 'player_' + Math.random().toString(36).substr(2, 9);
-        sessionStorage.setItem('sequence_playerId', pid);
-      }
-      setPlayerId(pid);
-    };
-
-    initializePlayerId();
-  }, []);
+  const playerIdRef = useRef(null);
 
   const [appState, setAppState] = useState('lobby');
   const [roomInput, setRoomInput] = useState('');
@@ -70,42 +57,18 @@ export default function SequenceGame() {
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const [lastMoveTime, setLastMoveTime] = useState(0);
 
-
-  // Focus management for accessibility
+  // Initialize playerId and set up socket listeners (run once)
   useEffect(() => {
-    // Update focusable elements ref
-    const focusableElements = Array.from(
-      document.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
-    ).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
-    focusableElementsRef.current = focusableElements;
-
-    // Focus management based on app state
-    if (appState === 'lobby' && playerName === '') {
-      // Focus on name input when entering lobby
-      setTimeout(() => {
-        const nameInput = document.querySelector('input[placeholder="Name"]');
-        if (nameInput) nameInput.focus();
-      }, 100);
-    } else if (appState === 'team_select') {
-      // Focus on first team button
-      setTimeout(() => {
-        const firstTeamButton = document.querySelector('button[onclick*="join_team"]');
-        if (firstTeamButton) firstTeamButton.focus();
-      }, 100);
+    // Get or create player ID
+    let pid = sessionStorage.getItem('sequence_playerId');
+    if (!pid) {
+      pid = 'player_' + Math.random().toString(36).substr(2, 9);
+      sessionStorage.setItem('sequence_playerId', pid);
     }
-  }, [appState, playerName]);
+    playerIdRef.current = pid;
 
-  useEffect(() => {
-    const savedRoom = sessionStorage.getItem('sequence_room');
-    const savedName = sessionStorage.getItem('sequence_name');
-    if (savedRoom && savedName) {
-      setRoomInput(savedRoom); setPlayerName(savedName);
-      socket.emit('join_room', { roomId: savedRoom, playerName: savedName, playerId, avatar });
-    }
-  }, [playerId]);
-
-  useEffect(() => {
-    socket.on('room_joined', (roomId) => {
+    // Socket event listeners
+    const handleRoomJoined = (roomId) => {
       setCurrentRoom(roomId);
       setAppState('team_select');
       // Focus on team selection after joining
@@ -113,19 +76,23 @@ export default function SequenceGame() {
         const firstTeamButton = document.querySelector('button[onclick*="join_team"]');
         if (firstTeamButton) firstTeamButton.focus();
       }, 100);
-    });
-    socket.on('room_info', (info) => { if(info) setRoomInfo(info); });
-    socket.on('assigned_team', (color) => {
+    };
+
+    const handleRoomInfo = (info) => {
+      if (info) setRoomInfo(info);
+    };
+
+    const handleAssignedTeam = (color) => {
       setMyTeam(color);
       setAppState('game');
       // Focus on game board when entering game
       setTimeout(() => {
         if (boardRef.current) boardRef.current.focus();
       }, 100);
-    });
+    };
 
-    socket.on('game_state', (gameState) => {
-      if(!gameState) return;
+    const handleGameState = (gameState) => {
+      if (!gameState) return;
 
       // Optimistic update: set state immediately for better perceived performance
       setBoardChips(gameState.board || Array(100).fill(null));
@@ -149,22 +116,22 @@ export default function SequenceGame() {
           confetti({ particleCount: 150, spread: 100, origin: { y: 0.4 }, colors: ['#ffffff', '#f97316', '#ec4899'] });
         }, 600);
       }
-    });
+    };
 
-    socket.on('receive_ping', ({ index, teamColor }) => {
+    const handleReceivePing = ({ index, teamColor }) => {
       if (teamColor === myTeam) {
         setActivePings(prev => ({ ...prev, [index]: true }));
-        setTimeout(() => setActivePings(prev => { const n = {...prev}; delete n[index]; return n; }), 3000);
+        setTimeout(() => setActivePings(prev => { const n = { ...prev }; delete n[index]; return n; }), 3000);
 
         // Add subtle haptic feedback simulation for touch devices
         if ('vibrate' in navigator) {
           navigator.vibrate(10);
         }
       }
-    });
+    };
 
-    socket.on('your_hand', (dealtHand) => setHand(dealtHand || []));
-    socket.on('chat_message', (msg) => {
+    const handleYourHand = (dealtHand) => setHand(dealtHand || []);
+    const handleChatMessage = (msg) => {
       setChats(prev => [...prev, msg]);
       playSound('chat');
 
@@ -175,14 +142,14 @@ export default function SequenceGame() {
           chatContainer.scrollTop = chatContainer.scrollHeight;
         }
       }, 100);
-    });
+    };
 
-    socket.on('game_restarted', (allHands) => {
+    const handleGameRestarted = (allHands) => {
       setWinner(null);
       setWinningLine([]);
       setActivePings({});
-      if (allHands && allHands[playerId]) {
-        setHand(allHands[playerId]);
+      if (allHands && allHands[playerIdRef.current]) {
+        setHand(allHands[playerIdRef.current]);
         setSelectedCard(null);
       }
       setChats([]);
@@ -193,9 +160,9 @@ export default function SequenceGame() {
           handRef.current[0]?.focus?.();
         }
       }, 100);
-    });
+    };
 
-    socket.on('error_message', (msg) => {
+    const handleErrorMessage = (msg) => {
       alert(msg);
       // Focus back to relevant input after error
       if (appState === 'lobby') {
@@ -204,11 +171,35 @@ export default function SequenceGame() {
           if (nameInput) nameInput.focus();
         }, 100);
       }
-    });
+    };
 
-    return () => socket.offAny();
-  }, [playerId, myTeam, winner, isMyTurn, appState]);
+    // Register listeners
+    socket.on('room_joined', handleRoomJoined);
+    socket.on('room_info', handleRoomInfo);
+    socket.on('assigned_team', handleAssignedTeam);
+    socket.on('game_state', handleGameState);
+    socket.on('receive_ping', handleReceivePing);
+    socket.on('your_hand', handleYourHand);
+    socket.on('chat_message', handleChatMessage);
+    socket.on('game_restarted', handleGameRestarted);
+    socket.on('error_message', handleErrorMessage);
 
+    // Attempt to restore previous session
+    const savedRoom = sessionStorage.getItem('sequence_room');
+    const savedName = sessionStorage.getItem('sequence_name');
+    if (savedRoom && savedName) {
+      setRoomInput(savedRoom);
+      setPlayerName(savedName);
+      socket.emit('join_room', { roomId: savedRoom, playerName: savedName, playerId: pid, avatar });
+    }
+
+    // Cleanup on unmount
+    return () => {
+      socket.offAny();
+    };
+  }, []); // Empty deps: run once
+
+  // Timer effect for turn deadline (does NOT depend on playerId)
   useEffect(() => {
     if (!turnDeadline || winner || !isGameStarted) {
       setTimeLeft(60);
@@ -218,25 +209,25 @@ export default function SequenceGame() {
       const remaining = Math.max(0, Math.floor((turnDeadline - Date.now()) / 1000));
       setTimeLeft(remaining);
       if (remaining === 0 && socket.id === activePlayerId) {
-        socket.emit('timeout_skip', { roomId: currentRoom, playerId });
+        socket.emit('timeout_skip', { roomId: currentRoom, playerId: playerIdRef.current });
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [turnDeadline, winner, isGameStarted, activePlayerId, currentRoom, playerId]);
+  }, [turnDeadline, winner, isGameStarted, activePlayerId, currentRoom]); // No playerId dep
 
   const handleJoinRoom = (e) => {
     e.preventDefault();
     if (roomInput.trim() && playerName.trim()) {
       sessionStorage.setItem('sequence_room', roomInput.trim());
       sessionStorage.setItem('sequence_name', playerName.trim());
-      socket.emit('join_room', { roomId: roomInput.trim(), playerName: playerName.trim(), playerId, avatar });
+      socket.emit('join_room', { roomId: roomInput.trim(), playerName: playerName.trim(), playerId: playerIdRef.current, avatar });
     }
   };
 
   const handleSendChat = (e) => {
     e.preventDefault();
     if (chatInput.trim()) {
-      socket.emit('send_chat', { roomId: currentRoom, playerId, msg: chatInput });
+      socket.emit('send_chat', { roomId: currentRoom, playerId: playerIdRef.current, msg: chatInput });
       setChatInput('');
     }
   };
@@ -259,7 +250,7 @@ export default function SequenceGame() {
   };
 
   const handleCellClick = (index) => {
-    if (!isGameStarted || winner || playerId !== activePlayerId || !selectedCard || BOARD_LAYOUT[index] === 'FREE') return;
+    if (!isGameStarted || winner || playerIdRef.current !== activePlayerId || !selectedCard || BOARD_LAYOUT[index] === 'FREE') return;
 
     const targetSpace = BOARD_LAYOUT[index];
     const isTwoEyed = selectedCard === 'J♦' || selectedCard === 'J♣';
@@ -276,7 +267,7 @@ export default function SequenceGame() {
       navigator.vibrate(15); // Subtle vibration for chip placement
     }
 
-    socket.emit('place_chip', { roomId: currentRoom, index, teamColor: myTeam, playedCard: selectedCard, playerId });
+    socket.emit('place_chip', { roomId: currentRoom, index, teamColor: myTeam, playedCard: selectedCard, playerId: playerIdRef.current });
 
     // Optimistic UI update for immediate feedback
     setHand(hand.filter(card => card !== selectedCard));
@@ -286,12 +277,14 @@ export default function SequenceGame() {
     // This creates a better UX by showing immediate response
     setTimeout(() => {
       // If we still have the card in hand after a short delay, it means server rejected it
-      // In a real app, we'd get a specific error, but for now we'll revert optimistically
-      // Actually, we'll rely on server correction via game_state updates
+      // In a real app, we'd get a specific error, but for now we'll rely on server correction via game_state updates
     }, 1000);
   };
 
-  const handleDisconnect = () => { sessionStorage.clear(); window.location.reload(); };
+  const handleDisconnect = () => {
+    sessionStorage.clear();
+    window.location.reload();
+  };
 
   // PLAYFUL THEME
   const t = {
@@ -337,7 +330,7 @@ export default function SequenceGame() {
 
        <div className="bg-white/20 backdrop-blur-md p-8 rounded-3xl shadow-2xl w-full max-w-2xl text-center z-10">
           <h1 className="text-5xl font-bold text-gray-800">SEQUENCE</h1>
-          
+
           {appState === 'lobby' ? (
             <form onSubmit={handleJoinRoom} className="flex flex-col gap-4 max-w-md mx-auto">
               <div className="flex justify-center gap-2 mb-4">
@@ -355,7 +348,7 @@ export default function SequenceGame() {
                 <div key={color} className="flex flex-col gap-2 border border-white/10 p-4 rounded-2xl bg-black/20">
                   <h3 className={`font-black text-xl uppercase ${getTeamNeon(color)}`}>{color}</h3>
                   <div className="text-sm font-bold opacity-70 mb-4 h-16">{roomInfo[color]?.join(', ') || 'Empty'}</div>
-                  <button onClick={() => socket.emit('join_team', {roomId: currentRoom, teamColor: color, playerId})} disabled={roomInfo[color]?.length >= 4} className="bg-white/10 py-2 rounded-lg font-bold hover:bg-white/20 transition-colors transform active:scale-95">
+                  <button onClick={() => socket.emit('join_team', {roomId: currentRoom, teamColor: color, playerId: playerIdRef.current})} disabled={roomInfo[color]?.length >= 4} className="bg-white/10 py-2 rounded-lg font-bold hover:bg-white/20 transition-colors transform active:scale-95">
                     JOIN TEAM
                   </button>
                   <button onClick={() => socket.emit('add_bot', {roomId: currentRoom, teamColor: color})} disabled={roomInfo[color]?.length >= 4} className="bg-white/5 py-2 rounded-lg font-bold text-xs hover:bg-white/10 transition-colors transform active:scale-95">🤖 ADD BOT</button>
@@ -368,12 +361,12 @@ export default function SequenceGame() {
   );
 
   // Define logic booleans *after* team select check to prevent undefined errors
-  const isMyTurn = playerId === activePlayerId && isGameStarted && !winner;
+  const isMyTurn = playerIdRef.current === activePlayerId && isGameStarted && !winner;
   const isDeadCard = selectedCard && checkDeadCard(selectedCard);
 
   return (
     <div className={`min-h-[100dvh] ${t.bg} text-gray-900 flex flex-col md:flex-row p-2 sm:p-4 gap-4 overflow-hidden font-sans relative`}>
-      
+
       {/* WAITING TO START OVERLAY (Prioritized below winner) */}
       {!isGameStarted && !winner && (
         <div className="absolute inset-0 z-40 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center animate-in fade-in duration-500">
@@ -381,12 +374,12 @@ export default function SequenceGame() {
             {myTeam.toUpperCase()} SQUAD DEPLOYED
           </h2>
 
-          {playerId === hostId ? (
+          {playerIdRef.current === hostId ? (
             <>
               <p className="text-slate-300 mb-8 font-bold tracking-widest text-center">
                 You are the Room Host.<br/> Players: {roomInfo.total}
               </p>
-              
+
               <div className="flex gap-4 mb-8">
                 {['red', 'blue', 'green'].map(color => (
                   <button key={color} onClick={() => socket.emit('add_bot', {roomId: currentRoom, teamColor: color})} disabled={roomInfo[color]?.length >= 4} className="border border-white/20 px-4 py-2 rounded-lg font-bold text-xs hover:bg-white/10 transition-colors uppercase bg-black/40 active:scale-95">
@@ -434,11 +427,11 @@ export default function SequenceGame() {
               const isWinChip = winningLine.includes(idx);
               const isPung = activePings[idx];
               const isMatch = isMyTurn && selectedCard && ((card === selectedCard && !chip) || (selectedCard.includes('J') && ((selectedCard.includes('♦')||selectedCard.includes('♣'))?!chip:chip&&chip!==myTeam)));
-              
+
               return (
-                <div key={idx} onClick={() => handleCellClick(idx)} onContextMenu={(e) => handlePing(e, idx)} 
+                <div key={idx} onClick={() => handleCellClick(idx)} onContextMenu={(e) => handlePing(e, idx)}
                      className={`relative aspect-[3/4] rounded flex items-center justify-center ${card==='FREE'?t.freeCell:t.regCell} ${isMatch?'ring-4 ring-white z-10 scale-110 cursor-pointer':''} ${winner && !isWinChip ? 'opacity-30' : ''} ${isPung ? 'ring-4 ring-rose-500 animate-pulse' : ''}`}>
-                  
+
                   {isPung && <div className="absolute inset-0 bg-rose-500/40 rounded animate-ping pointer-events-none"></div>}
 
                   {card!=='FREE' && <span className={`font-black text-[9px] sm:text-xs md:text-sm ${card.includes('♥')||card.includes('♦')?'text-red-600':'text-black'}`}>{card}</span>}
@@ -462,7 +455,7 @@ export default function SequenceGame() {
                 ))}
               </div>
               {isMyTurn && isDeadCard && (
-                <button onClick={() => {socket.emit('trade_dead_card', {roomId: currentRoom, playerId, deadCard: selectedCard}); setSelectedCard(null)}} className="mt-4 bg-rose-600 px-6 py-2 rounded-full font-bold animate-bounce shadow-lg shadow-rose-500/50">TRADE DEAD CARD</button>
+                <button onClick={() => {socket.emit('trade_dead_card', {roomId: currentRoom, playerId: playerIdRef.current, deadCard: selectedCard}); setSelectedCard(null)}} className="mt-4 bg-rose-600 px-6 py-2 rounded-full font-bold animate-bounce shadow-lg shadow-rose-500/50">TRADE DEAD CARD</button>
               )}
             </>
           )}
