@@ -19,9 +19,7 @@ const getSessionPlayerId = () => {
 };
 
 export default function SequenceGame() {
-  const [playerId] = useState(getSessionPlayerId());
 
-  const [theme, setTheme] = useState(localStorage.getItem('seq_theme') || 'cyber');
   const [avatar, setAvatar] = useState('😎');
 
   const [appState, setAppState] = useState('lobby');
@@ -64,9 +62,6 @@ export default function SequenceGame() {
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const [lastMoveTime, setLastMoveTime] = useState(0);
 
-  useEffect(() => {
-    localStorage.setItem('seq_theme', theme);
-  }, [theme]);
 
   // Focus management for accessibility
   useEffect(() => {
@@ -290,61 +285,50 @@ export default function SequenceGame() {
 
   const handleDisconnect = () => { sessionStorage.clear(); window.location.reload(); };
 
-  // THEME ENGINE
+  // PLAYFUL THEME
   const t = {
-    bg: theme === 'cyber'
-      ? "bg-[#0f172a] bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-[linear-gradient(180deg,rgba(15,23,42,0.9)_0%,rgba(10,15,26,0.7)_100%)]"
-      : "bg-[#2d1b11] bg-[url('https://www.transparenttextures.com/patterns/wood-pattern.png')] bg-[linear-gradient(180deg,rgba(45,27,17,0.9)_0%,rgba(30,18,10,0.7)_100%)]",
-    card: theme === 'cyber'
-      ? "bg-white/10 backdrop-blur-md border border-white/20 shadow-lg hover:shadow-xl transition-shadow duration-300"
-      : "bg-[#f5deb3]/80 backdrop-blur-sm border border-[#8b4513]/50 shadow-lg hover:shadow-xl transition-shadow duration-300",
-    boardBg: theme === 'cyber'
-      ? "bg-white/5 backdrop-blur-sm border border-white/10"
-      : "bg-[#5c3a21]/80 backdrop-blur-sm border border-[#3e2723]/50",
-    freeCell: theme === 'cyber'
-      ? "bg-amber-300/30 backdrop-blur-sm border border-amber-400/50"
-      : "bg-[#d4af37]/80 backdrop-blur-sm border border-[#b8860b]/50",
-    regCell: theme === 'cyber'
-      ? "bg-white/5 backdrop-blur-sm border border-white/10"
-      : "bg-[#e8d5b5]/80 backdrop-blur-sm border border-[#a0522d]/30",
+    bg: "bg-gradient-to-br from-pink-400 via-yellow-400 to-orange-400",
+    card: "bg-white/90 border border-gray-200/50 shadow-lg hover:shadow-xl transition-all duration-300",
+    boardBg: "bg-white/80 border border-gray-300/30",
+    freeCell: "bg-yellow-200/50 border border-yellow-400/50",
+    regCell: "bg-white/30 border border-gray-200/30",
   };
 
   const getTeamNeon = (team) =>
     team === 'red'
-      ? 'text-rose-400 drop-shadow-[0_0_8px_rgba(244,63,94,0.6)]'
+      ? 'text-rose-600'
       : team === 'blue'
-        ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]'
+        ? 'text-blue-600'
         : team === 'green'
-          ? 'text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.6)]'
-          : 'text-slate-400';
+          ? 'text-green-600'
+          : 'text-gray-600';
 
   const getChipStyle = (color, isWin) => {
-    const cyberColors = color === 'red'
-      ? 'from-rose-400 to-rose-900 ring-rose-300/50 drop-shadow-[0_0_8px_rgba(244,63,94,0.4)]'
-      : color === 'blue'
-        ? 'from-cyan-400 to-cyan-900 ring-cyan-300/50 drop-shadow-[0_0_8px_rgba(34,211,238,0.4)]'
-        : 'from-emerald-400 to-emerald-900 ring-emerald-300/50 drop-shadow-[0_0_8px_rgba(52,211,153,0.4)]';
-    const woodColors = color === 'red'
-      ? 'from-red-600 to-red-800 ring-red-900/50 drop-shadow-[0_0_4px_rgba(139,69,19,0.3)]'
-      : color === 'blue'
-        ? 'from-blue-600 to-blue-800 ring-blue-900/50 drop-shadow-[0_0_4px_rgba(0,0,0,0.2)]'
-        : 'from-green-600 to-green-800 ring-green-900/50 drop-shadow-[0_0_4px_rgba(34,139,34,0.3)]';
-    const base = theme === 'cyber' ? cyberColors : woodColors;
-
-    return `bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] ${base} shadow-[inset_0_2px_4px_rgba(255,255,255,0.2)] ring-1/20 ${isWin ? 'animate-bounce ring-4/30 shadow-[0_0_20px_rgba(255,255,255,0.6)]' : ''}`;
+    let bg;
+    if (color === 'red') {
+      bg = 'bg-gradient-to-br from-rose-400 to-rose-600';
+    } else if (color === 'blue') {
+      bg = 'bg-gradient-to-br from-blue-400 to-blue-600';
+    } else {
+      bg = 'bg-gradient-to-br from-green-400 to-green-600';
+    }
+    const shadow = 'shadow-lg';
+    const ring = isWin ? 'ring-2 ring-white/50' : '';
+    return `${bg} ${shadow} ${ring}`;
   };
 
-  const layoutContainer = `min-h-[100dvh] w-full ${t.bg} text-white flex flex-col items-center justify-center p-2 sm:p-6 overflow-hidden font-sans`;
+  const layoutContainer = `min-h-[100dvh] w-full ${t.bg} text-gray-900 flex flex-col items-center justify-center p-2 sm:p-6 overflow-hidden font-sans`;
 
   if (appState === 'lobby' || appState === 'team_select') return (
     <div className={layoutContainer}>
-       <div className="absolute top-4 right-4 flex gap-2">
-         <button onClick={()=>setTheme('cyber')} className={`px-4 py-1 rounded font-bold ${theme==='cyber'?'bg-cyan-500 text-black':'bg-black/50 text-white'}`}>CYBER</button>
-         <button onClick={()=>setTheme('wood')} className={`px-4 py-1 rounded font-bold ${theme==='wood'?'bg-[#8b4513] text-white':'bg-black/50 text-white'}`}>WOOD</button>
+       <div className="mb-4">
+         <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-500 via-yellow-400 to-orange-500">
+           SEQUENCE
+         </h2>
        </div>
 
-       <div className={`backdrop-blur-2xl ${theme==='cyber'?'bg-white/[0.02] border-white/10':'bg-[#3e2723]/90 border-[#5c3a21]'} p-8 rounded-3xl shadow-2xl w-full max-w-2xl text-center z-10`}>
-          <h1 className={`text-5xl font-black mb-8 tracking-[0.2em] ${theme==='cyber'?'text-transparent bg-clip-text bg-gradient-to-r from-rose-400 to-cyan-400':'text-[#f5deb3] drop-shadow-md'}`}>SEQUENCE</h1>
+       <div className="bg-white/20 backdrop-blur-md p-8 rounded-3xl shadow-2xl w-full max-w-2xl text-center z-10">
+          <h1 className="text-5xl font-bold text-gray-800">SEQUENCE</h1>
           
           {appState === 'lobby' ? (
             <form onSubmit={handleJoinRoom} className="flex flex-col gap-4 max-w-md mx-auto">
@@ -355,7 +339,7 @@ export default function SequenceGame() {
               </div>
               <input type="text" placeholder="Name" value={playerName} onChange={e=>setPlayerName(e.target.value)} className="w-full p-4 bg-black/50 border border-white/10 rounded-xl text-center font-bold text-white" required />
               <input type="text" placeholder="Room Code" value={roomInput} onChange={e=>setRoomInput(e.target.value)} className="w-full p-4 bg-black/50 border border-white/10 rounded-xl text-center font-bold uppercase text-white" required />
-              <button className={`font-black py-4 rounded-xl mt-4 hover:scale-105 transition-transform ${theme==='cyber'?'bg-white text-black':'bg-[#f5deb3] text-[#3e2723]'}` active:scale-95>JOIN SQUAD</button>
+              <button className="bg-gradient-to-r from-pink-500 via-yellow-500 to-orange-500 text-white font-bold py-4 rounded-xl mt-4 hover:scale-105 transition-transform active:scale-95">JOIN SQUAD</button>
             </form>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -380,7 +364,7 @@ export default function SequenceGame() {
   const isDeadCard = selectedCard && checkDeadCard(selectedCard);
 
   return (
-    <div className={`min-h-[100dvh] ${t.bg} text-white flex flex-col md:flex-row p-2 sm:p-4 gap-4 overflow-hidden font-sans relative`}>
+    <div className={`min-h-[100dvh] ${t.bg} text-gray-900 flex flex-col md:flex-row p-2 sm:p-4 gap-4 overflow-hidden font-sans relative`}>
       
       {/* WAITING TO START OVERLAY (Prioritized below winner) */}
       {!isGameStarted && !winner && (
@@ -432,7 +416,7 @@ export default function SequenceGame() {
            <div className={`font-black tracking-widest ${isGameStarted ? getTeamNeon(currentTurn) : 'text-slate-500'}`}>
              {winner ? 'MATCH COMPLETE' : isGameStarted ? `${activePlayerName}'S TURN` : 'STANDBY...'}
            </div>
-           <div className={`font-bold ${theme==='cyber'?'text-white':'text-[#f5deb3]'}`}>THEME: {theme.toUpperCase()}</div>
+           <div className="font-bold text-gray-600">THEME: PLAYFUL</div>
         </div>
 
         <div className={`w-full p-2 rounded-[2rem] border transition-all ${t.boardBg}`}>
