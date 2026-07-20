@@ -44,9 +44,6 @@ export default function SequenceGame() {
   const [chats, setChats] = useState([]);
   const [activePings, setActivePings] = useState({});
 
-  const boardRef = useRef(null);
-  const handRef = useRef([]);
-
   useEffect(() => {
     let pid = sessionStorage.getItem('sequence_playerId');
     if (!pid) {
@@ -279,7 +276,6 @@ export default function SequenceGame() {
   const isDeadCard = selectedCard && checkDeadCard(selectedCard);
 
   return (
-    // Changed overflow-hidden to h-[100dvh] overflow-y-auto so mobile fits main content natively but can scroll to chat
     <div className={`h-[100dvh] overflow-y-auto overflow-x-hidden ${t.bg} text-gray-900 flex flex-col md:flex-row p-2 sm:p-4 gap-4 font-sans relative`}>
 
       {/* WAITING TO START OVERLAY */}
@@ -309,10 +305,19 @@ export default function SequenceGame() {
                     <div className="text-gray-500 text-sm font-bold text-center italic py-2">Empty</div>
                   )}
                 </div>
+                
+                {/* Dynamic Host Controls for Adding/Removing Bots */}
                 {playerIdRef.current === hostId && (
-                  <button onClick={() => socket.emit('add_bot', {roomId: currentRoom, teamColor: color})} disabled={roomInfo[color]?.length >= 4} className="w-full bg-white/10 border border-white/20 py-2 rounded-lg font-bold text-xs hover:bg-white/20 transition-colors uppercase text-white active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
-                    + Add Bot
-                  </button>
+                  <div className="w-full flex gap-2">
+                    <button onClick={() => socket.emit('add_bot', {roomId: currentRoom, teamColor: color})} disabled={roomInfo[color]?.length >= 4} className="flex-1 bg-white/10 border border-white/20 py-2 rounded-lg font-bold text-xs hover:bg-white/20 transition-colors uppercase text-white active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
+                      + Add Bot
+                    </button>
+                    {roomInfo[color]?.some(p => p.includes('🤖 Bot')) && (
+                      <button onClick={() => socket.emit('remove_bot', {roomId: currentRoom, teamColor: color})} className="flex-1 bg-rose-500/20 border border-rose-500/40 py-2 rounded-lg font-bold text-xs hover:bg-rose-500/40 transition-colors uppercase text-rose-200 active:scale-95">
+                        - Remove
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             ))}
@@ -337,7 +342,7 @@ export default function SequenceGame() {
         </div>
       )}
 
-      {/* LEFT: Game Board - Shrunk margins and sizing for perfect mobile fit */}
+      {/* LEFT: Game Board */}
       <div className="flex-1 flex flex-col items-center justify-start md:justify-center max-w-5xl mx-auto w-full relative z-10 min-h-[calc(100dvh-1rem)] md:min-h-0 pb-4 md:pb-0 shrink-0">
         <div className="w-full flex justify-between bg-black/40 border border-white/10 p-2 sm:p-3 rounded-xl sm:rounded-2xl mb-2 sm:mb-4 shadow-sm backdrop-blur-md">
            <div className={`font-black tracking-widest text-xs sm:text-base ${isGameStarted ? getTeamNeon(currentTurn) : 'text-slate-500'}`}>
