@@ -12,7 +12,6 @@ const playSound = (type) => {
   if (sounds[type] && sounds[type].src) sounds[type].play().catch(() => {});
 };
 
-// Custom CSS Animation for the chip dropping physically onto the board
 const chipAnimationStyles = `
   @keyframes chipDrop {
     0% { transform: scale(2) translateY(-20px); opacity: 0; box-shadow: 0 20px 20px rgba(0,0,0,0.6); }
@@ -23,11 +22,17 @@ const chipAnimationStyles = `
   }
 `;
 
+// --- REAL HIGH-QUALITY CARD IMAGES (PERFECT CORNER CIRCLES FIX) ---
 const CardVisual = ({ card }) => {
   if (card === 'FREE') {
     return (
-      <div className="absolute inset-0 w-full h-full bg-[#f8f9fa] flex items-center justify-center rounded-[3px] sm:rounded-md border border-gray-400 shadow-sm">
-        <div className="w-[65%] h-[65%] rounded-full bg-gradient-to-br from-amber-400 to-orange-600 shadow-[inset_0_-3px_6px_rgba(0,0,0,0.4),0_2px_4px_rgba(0,0,0,0.2)]"></div>
+      <div className="absolute inset-0 w-full h-full bg-[#f8f9fa] flex items-center justify-center rounded-[3px] sm:rounded-md border border-gray-400 shadow-sm overflow-hidden">
+        {/* aspect-square ensures it is a perfect circle, never an oval */}
+        <div className="w-[85%] aspect-square rounded-full bg-[#ff6600] flex items-center justify-center shadow-[inset_0_-3px_5px_rgba(0,0,0,0.4),0_2px_4px_rgba(0,0,0,0.3)] border-[1px] border-[#ff8c33]">
+           <span className="text-white font-black text-[4.5px] sm:text-[6.5px] md:text-[8px] lg:text-[10px] tracking-tight drop-shadow-[0_1px_1px_rgba(0,0,0,0.6)] rotate-[-40deg] select-none">
+             SEQUENCE
+           </span>
+        </div>
       </div>
     );
   }
@@ -35,12 +40,18 @@ const CardVisual = ({ card }) => {
   const value = card.slice(0, -1);
   const suit = card.slice(-1);
   const suitMap = { '♠': 'S', '♣': 'C', '♥': 'H', '♦': 'D' };
+  
   const apiValue = value === '10' ? '0' : value;
   const imageUrl = `https://deckofcardsapi.com/static/img/${apiValue}${suitMap[suit]}.png`;
 
   return (
     <div className="absolute inset-0 w-full h-full bg-white rounded-[3px] sm:rounded-md border border-gray-300 shadow-sm overflow-hidden">
-      <img src={imageUrl} alt={card} className="w-full h-full object-fill pointer-events-none" loading="lazy" />
+      <img 
+        src={imageUrl} 
+        alt={card} 
+        className="w-full h-full object-fill pointer-events-none" 
+        loading="lazy"
+      />
     </div>
   );
 };
@@ -67,7 +78,7 @@ export default function SequenceGame() {
 
   const [hostId, setHostId] = useState(null);
   const [turnDeadline, setTurnDeadline] = useState(0);
-  const [lastMoveIndex, setLastMoveIndex] = useState(null); // NEW: Track Last Move
+  const [lastMoveIndex, setLastMoveIndex] = useState(null);
 
   const [myTeam, setMyTeam] = useState('');
   const [hand, setHand] = useState([]);
@@ -113,7 +124,7 @@ export default function SequenceGame() {
       setWinningLine(gameState.winningLine || []);
       setHostId(gameState.hostId);
       setTurnDeadline(gameState.turnDeadline || 0);
-      setLastMoveIndex(gameState.lastMoveIndex); // Apply the last move
+      setLastMoveIndex(gameState.lastMoveIndex);
 
       if (gameState.winner && !winner) {
         playSound('win');
@@ -254,14 +265,14 @@ export default function SequenceGame() {
   const t = { bg: "bg-gradient-to-br from-[#0f5c6e] via-[#1a7f92] to-[#1292a8]" };
 
   const getTeamNeon = (team) =>
-    team === 'red' ? 'text-rose-400' : team === 'blue' ? 'text-blue-300' : team === 'green' ? 'text-green-400' : 'text-gray-300';
+    team === 'red' ? 'text-red-400' : team === 'blue' ? 'text-blue-400' : team === 'green' ? 'text-green-400' : 'text-gray-300';
 
+  // --- PERFECTLY ROUND & SOLID CHIP COLORS ---
   const getChipStyle = (color, isWin, isLast) => {
-    let bg = color === 'red' ? 'bg-gradient-to-br from-rose-500 to-rose-700 ring-1 ring-rose-400' 
-           : color === 'blue' ? 'bg-gradient-to-br from-blue-500 to-blue-700 ring-1 ring-blue-400' 
-           : 'bg-gradient-to-br from-green-500 to-green-700 ring-1 ring-green-400';
+    let bg = color === 'red' ? 'bg-[#ff0000] border border-red-900' 
+           : color === 'blue' ? 'bg-[#0000ff] border border-blue-900' 
+           : 'bg-[#00cc00] border border-green-900';
            
-    // Add the glowing yellow pulse if it was the last move made
     let highlight = isLast && !isWin ? 'ring-[3px] ring-yellow-400 shadow-[0_0_20px_rgba(250,204,21,1)] z-30 chip-drop' : '';
     let winGlow = isWin ? 'ring-4 ring-white animate-pulse shadow-[0_0_20px_rgba(255,255,255,1)] z-30' : '';
     
@@ -402,11 +413,11 @@ export default function SequenceGame() {
 
                   <CardVisual card={card} />
 
-                  {/* Render dropping chip if it exists */}
+                  {/* PERFECTLY ROUND CHIP FIX: w-[80%] and aspect-square forces it into a flawless circle */}
                   {chip && (
                     <div 
-                      key={`chip-${idx}-${chip}`} // Forces re-render animation if chip changes
-                      className={`absolute w-[75%] h-[75%] rounded-full z-10 ${getChipStyle(chip, isWinChip, isLastMove)} pointer-events-none`} 
+                      key={`chip-${idx}-${chip}`}
+                      className={`absolute w-[80%] sm:w-[75%] aspect-square rounded-full z-10 flex items-center justify-center ${getChipStyle(chip, isWinChip, isLastMove)} pointer-events-none`} 
                     />
                   )}
                 </div>
