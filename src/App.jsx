@@ -22,13 +22,12 @@ const chipAnimationStyles = `
   }
 `;
 
-// --- REAL HIGH-QUALITY CARD IMAGES (PERFECT CORNER CIRCLES FIX) ---
+// --- REAL HIGH-QUALITY CARD IMAGES ---
 const CardVisual = ({ card }) => {
   if (card === 'FREE') {
     return (
       <div className="absolute inset-0 w-full h-full bg-[#f8f9fa] flex items-center justify-center rounded-[3px] sm:rounded-md border border-gray-400 shadow-sm overflow-hidden">
-        {/* aspect-square ensures it is a perfect circle, never an oval */}
-        <div className="w-[85%] aspect-square rounded-full bg-[#ff6600] flex items-center justify-center shadow-[inset_0_-3px_5px_rgba(0,0,0,0.4),0_2px_4px_rgba(0,0,0,0.3)] border-[1px] border-[#ff8c33]">
+        <div className="w-[85%] aspect-square rounded-full bg-[#e65c00] flex items-center justify-center shadow-[inset_0_-3px_5px_rgba(0,0,0,0.3),0_2px_4px_rgba(0,0,0,0.3)] border-[1px] border-[#ff7a29]">
            <span className="text-white font-black text-[4.5px] sm:text-[6.5px] md:text-[8px] lg:text-[10px] tracking-tight drop-shadow-[0_1px_1px_rgba(0,0,0,0.6)] rotate-[-40deg] select-none">
              SEQUENCE
            </span>
@@ -267,16 +266,17 @@ export default function SequenceGame() {
   const getTeamNeon = (team) =>
     team === 'red' ? 'text-red-400' : team === 'blue' ? 'text-blue-400' : team === 'green' ? 'text-green-400' : 'text-gray-300';
 
-  // --- PERFECTLY ROUND & SOLID CHIP COLORS ---
+  // --- SOFTER MATTE CHIP COLORS ---
   const getChipStyle = (color, isWin, isLast) => {
-    let bg = color === 'red' ? 'bg-[#ff0000] border border-red-900' 
-           : color === 'blue' ? 'bg-[#0000ff] border border-blue-900' 
-           : 'bg-[#00cc00] border border-green-900';
+    let bg = color === 'red' ? 'bg-[#cc2929] border border-[#7a1818]' 
+           : color === 'blue' ? 'bg-[#2563eb] border border-[#173d8f]' 
+           : 'bg-[#16a34a] border border-[#0f6b30]';
            
-    let highlight = isLast && !isWin ? 'ring-[3px] ring-yellow-400 shadow-[0_0_20px_rgba(250,204,21,1)] z-30 chip-drop' : '';
+    let highlight = isLast && !isWin ? 'ring-[3px] ring-yellow-400 shadow-[0_0_20px_rgba(250,204,21,0.8)] z-30 chip-drop' : '';
     let winGlow = isWin ? 'ring-4 ring-white animate-pulse shadow-[0_0_20px_rgba(255,255,255,1)] z-30' : '';
     
-    return `${bg} shadow-[2px_4px_6px_rgba(0,0,0,0.6)] ${highlight} ${winGlow}`;
+    // Softer shadow logic
+    return `${bg} shadow-[2px_3px_5px_rgba(0,0,0,0.4)] ${highlight} ${winGlow}`;
   };
 
   if (appState === 'lobby' || appState === 'team_select') return (
@@ -413,7 +413,6 @@ export default function SequenceGame() {
 
                   <CardVisual card={card} />
 
-                  {/* PERFECTLY ROUND CHIP FIX: w-[80%] and aspect-square forces it into a flawless circle */}
                   {chip && (
                     <div 
                       key={`chip-${idx}-${chip}`}
