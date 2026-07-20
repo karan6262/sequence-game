@@ -20,6 +20,15 @@ const chipAnimationStyles = `
   .chip-drop {
     animation: chipDrop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
   }
+  @keyframes drawLine {
+    from { stroke-dashoffset: 100; }
+    to { stroke-dashoffset: 0; }
+  }
+  .winning-line {
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+    animation: drawLine 1s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  }
 `;
 
 // --- REAL HIGH-QUALITY CARD IMAGES ---
@@ -127,9 +136,10 @@ export default function SequenceGame() {
 
       if (gameState.winner && !winner) {
         playSound('win');
+        // Triggers the confetti blasts
         setTimeout(() => {
-          confetti({ particleCount: 200, spread: 120, origin: { y: 0.6 }, colors: [gameState.winner === 'red' ? '#f43f5e' : gameState.winner === 'blue' ? '#22d3ee' : '#34d399', '#ffffff'] });
-        }, 300);
+          confetti({ particleCount: 250, spread: 150, origin: { y: 0.6 }, colors: [gameState.winner === 'red' ? '#ef4444' : gameState.winner === 'blue' ? '#3b82f6' : '#22c55e', '#ffffff'] });
+        }, 200);
         setTimeout(() => {
           confetti({ particleCount: 150, spread: 100, origin: { y: 0.4 }, colors: ['#ffffff', '#f97316', '#ec4899'] });
         }, 600);
@@ -266,7 +276,6 @@ export default function SequenceGame() {
   const getTeamNeon = (team) =>
     team === 'red' ? 'text-red-400' : team === 'blue' ? 'text-blue-400' : team === 'green' ? 'text-green-400' : 'text-gray-300';
 
-  // --- SOFTER MATTE CHIP COLORS ---
   const getChipStyle = (color, isWin, isLast) => {
     let bg = color === 'red' ? 'bg-[#cc2929] border border-[#7a1818]' 
            : color === 'blue' ? 'bg-[#2563eb] border border-[#173d8f]' 
@@ -275,7 +284,6 @@ export default function SequenceGame() {
     let highlight = isLast && !isWin ? 'ring-[3px] ring-yellow-400 shadow-[0_0_20px_rgba(250,204,21,0.8)] z-30 chip-drop' : '';
     let winGlow = isWin ? 'ring-4 ring-white animate-pulse shadow-[0_0_20px_rgba(255,255,255,1)] z-30' : '';
     
-    // Softer shadow logic
     return `${bg} shadow-[2px_3px_5px_rgba(0,0,0,0.4)] ${highlight} ${winGlow}`;
   };
 
@@ -318,6 +326,9 @@ export default function SequenceGame() {
 
   const isMyTurn = playerIdRef.current === activePlayerId && isGameStarted && !winner;
   const isDeadCard = selectedCard && checkDeadCard(selectedCard);
+
+  // Line drawing colors
+  const strokeColor = winner === 'red' ? '#ef4444' : winner === 'blue' ? '#3b82f6' : '#22c55e';
 
   return (
     <div className={`min-h-[100dvh] md:h-[100dvh] overflow-y-auto md:overflow-hidden ${t.bg} text-white flex flex-col md:flex-row p-2 sm:p-4 gap-4 font-sans relative`}>
@@ -375,13 +386,13 @@ export default function SequenceGame() {
         </div>
       )}
 
-      {/* GAME OVER OVERLAY */}
+      {/* --- NEW FLOATING GAME OVER MODAL (No Board Blackout) --- */}
       {winner && (
-        <div className="absolute inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center animate-in fade-in duration-300">
-          <h1 className={`text-6xl sm:text-8xl font-black mb-10 tracking-[0.2em] ${getTeamNeon(winner)}`}>{winner.toUpperCase()} WINS</h1>
-          <div className="flex gap-6">
-            <button onClick={() => socket.emit('restart_game', currentRoom)} className="bg-white text-black font-black py-4 px-8 rounded-xl hover:scale-105 transition-all shadow-[0_0_20px_rgba(255,255,255,0.3)]">PLAY AGAIN</button>
-            <button onClick={handleDisconnect} className="bg-transparent border border-white/20 text-white font-bold py-4 px-8 rounded-xl hover:bg-white/10 transition-all">LEAVE ROOM</button>
+        <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[100] bg-black/80 backdrop-blur-md border border-white/20 p-6 sm:p-10 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.8)] flex flex-col items-center justify-center animate-in fade-in zoom-in duration-500 w-[90vw] max-w-lg pointer-events-auto">
+          <h1 className={`text-5xl sm:text-7xl font-black mb-8 tracking-[0.2em] text-center ${getTeamNeon(winner)}`}>{winner.toUpperCase()} WINS</h1>
+          <div className="flex gap-4 w-full">
+            <button onClick={() => socket.emit('restart_game', currentRoom)} className="flex-1 bg-white text-black font-black py-4 px-4 rounded-xl hover:scale-105 transition-all shadow-[0_0_20px_rgba(255,255,255,0.3)] text-sm sm:text-base">PLAY AGAIN</button>
+            <button onClick={handleDisconnect} className="flex-1 bg-transparent border border-white/20 text-white font-bold py-4 px-4 rounded-xl hover:bg-white/10 transition-all text-sm sm:text-base">LEAVE ROOM</button>
           </div>
         </div>
       )}
@@ -396,8 +407,9 @@ export default function SequenceGame() {
            <div className="font-bold text-xs sm:text-base opacity-70 tracking-widest">SEQUENCE CLASSIC</div>
         </div>
 
-        <div className="w-full max-w-[95vw] md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto rounded-xl sm:rounded-[1rem] border border-white/20 shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden shrink-0 bg-white/5 p-1 sm:p-2">
-          <div className="grid grid-cols-10 gap-[2px] sm:gap-[3px] w-full bg-transparent">
+        <div className="w-full max-w-[95vw] md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto rounded-xl sm:rounded-[1rem] border border-white/20 shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden shrink-0 bg-white/5 p-1 sm:p-2 relative">
+          
+          <div className="grid grid-cols-10 gap-[2px] sm:gap-[3px] w-full bg-transparent relative z-10">
             {BOARD_LAYOUT.map((card, idx) => {
               const chip = boardChips[idx];
               const isWinChip = winningLine.includes(idx);
@@ -423,6 +435,25 @@ export default function SequenceGame() {
               );
             })}
           </div>
+
+          {/* --- NEW SVG ANIMATED STRIKE LINE --- */}
+          {winner && winningLine.length === 5 && (
+            <svg className="absolute inset-0 w-full h-full pointer-events-none z-40 drop-shadow-2xl">
+              <line
+                pathLength="100"
+                x1={`${(winningLine[0] % 10) * 10 + 5}%`}
+                y1={`${Math.floor(winningLine[0] / 10) * 10 + 5}%`}
+                x2={`${(winningLine[4] % 10) * 10 + 5}%`}
+                y2={`${Math.floor(winningLine[4] / 10) * 10 + 5}%`}
+                stroke={strokeColor}
+                strokeWidth="10"
+                strokeLinecap="round"
+                className="winning-line"
+                style={{ filter: `drop-shadow(0 0 8px ${strokeColor})` }}
+              />
+            </svg>
+          )}
+
         </div>
 
         <div className="w-full mt-4 sm:mt-8 flex flex-col items-center shrink-0">
