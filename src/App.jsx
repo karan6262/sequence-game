@@ -104,7 +104,7 @@ export default function SequenceGame() {
       setChats(prev => [...prev, msg]);
       playSound('chat');
       setTimeout(() => {
-        const chatContainer = document.querySelector('.flex-1.p-3.overflow-y-auto');
+        const chatContainer = document.querySelector('.chat-scroll-container');
         if (chatContainer) chatContainer.scrollTop = chatContainer.scrollHeight;
       }, 100);
     };
@@ -143,7 +143,7 @@ export default function SequenceGame() {
     }
 
     return () => socket.offAny();
-  }, []);
+  }, [winner]);
 
   useEffect(() => {
     if (!turnDeadline || winner || !isGameStarted) {
@@ -231,10 +231,8 @@ export default function SequenceGame() {
     return `${bg} shadow-lg ${isWin ? 'ring-2 ring-white/50' : ''}`;
   };
 
-  const layoutContainer = `min-h-[100dvh] w-full ${t.bg} text-gray-900 flex flex-col items-center justify-center p-2 sm:p-6 overflow-hidden font-sans`;
-
   if (appState === 'lobby' || appState === 'team_select') return (
-    <div className={layoutContainer}>
+    <div className={`min-h-[100dvh] w-full ${t.bg} text-gray-900 flex flex-col items-center justify-center p-2 sm:p-6 overflow-hidden font-sans`}>
        <div className="mb-4">
          <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-500 via-yellow-400 to-orange-500">
            SEQUENCE
@@ -276,7 +274,8 @@ export default function SequenceGame() {
   const isDeadCard = selectedCard && checkDeadCard(selectedCard);
 
   return (
-    <div className={`h-[100dvh] overflow-y-auto overflow-x-hidden ${t.bg} text-gray-900 flex flex-col md:flex-row p-2 sm:p-4 gap-4 font-sans relative`}>
+    // On Mobile: Single scrolling page (overflow-y-auto). On Desktop: Fixed screen height (md:h-[100dvh]) with independent columns.
+    <div className={`min-h-[100dvh] md:h-[100dvh] overflow-y-auto md:overflow-hidden ${t.bg} text-gray-900 flex flex-col md:flex-row p-2 sm:p-4 gap-4 font-sans relative`}>
 
       {/* WAITING TO START OVERLAY */}
       {!isGameStarted && !winner && (
@@ -306,7 +305,6 @@ export default function SequenceGame() {
                   )}
                 </div>
                 
-                {/* Dynamic Host Controls for Adding/Removing Bots */}
                 {playerIdRef.current === hostId && (
                   <div className="w-full flex gap-2">
                     <button onClick={() => socket.emit('add_bot', {roomId: currentRoom, teamColor: color})} disabled={roomInfo[color]?.length >= 4} className="flex-1 bg-white/10 border border-white/20 py-2 rounded-lg font-bold text-xs hover:bg-white/20 transition-colors uppercase text-white active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
@@ -342,16 +340,19 @@ export default function SequenceGame() {
         </div>
       )}
 
-      {/* LEFT: Game Board */}
-      <div className="flex-1 flex flex-col items-center justify-start md:justify-center max-w-5xl mx-auto w-full relative z-10 min-h-[calc(100dvh-1rem)] md:min-h-0 pb-4 md:pb-0 shrink-0">
-        <div className="w-full flex justify-between bg-black/40 border border-white/10 p-2 sm:p-3 rounded-xl sm:rounded-2xl mb-2 sm:mb-4 shadow-sm backdrop-blur-md">
+      {/* LEFT COLUMN: Game Board & Hand - Scrolls independently on desktop */}
+      <div className="flex-1 flex flex-col items-center justify-start w-full relative z-10 md:h-full md:overflow-y-auto md:pr-4 pb-12 shrink-0 scroll-smooth">
+        
+        {/* Desktop Title Bar */}
+        <div className="w-full flex justify-between bg-black/40 border border-white/10 p-2 sm:p-3 rounded-xl sm:rounded-2xl mt-2 mb-4 shadow-sm backdrop-blur-md shrink-0">
            <div className={`font-black tracking-widest text-xs sm:text-base ${isGameStarted ? getTeamNeon(currentTurn) : 'text-slate-500'}`}>
              {winner ? 'MATCH COMPLETE' : isGameStarted ? `${activePlayerName}'S TURN` : 'STANDBY...'}
            </div>
            <div className="font-bold text-xs sm:text-base text-gray-300">THEME: PLAYFUL</div>
         </div>
 
-        <div className={`w-full max-w-[95vw] sm:max-w-full p-1 sm:p-2 rounded-xl sm:rounded-[2rem] border transition-all ${t.boardBg}`}>
+        {/* Board Container */}
+        <div className={`w-full max-w-[95vw] md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto p-1 sm:p-2 rounded-xl sm:rounded-[2rem] border transition-all shrink-0 ${t.boardBg}`}>
           <div className="grid grid-cols-10 gap-[2px] sm:gap-1 w-full">
             {BOARD_LAYOUT.map((card, idx) => {
               const chip = boardChips[idx];
@@ -373,7 +374,8 @@ export default function SequenceGame() {
           </div>
         </div>
 
-        <div className="w-full mt-2 sm:mt-6 flex flex-col items-center shrink-0">
+        {/* Player Hand Container */}
+        <div className="w-full mt-4 sm:mt-8 flex flex-col items-center shrink-0">
           <p className="text-[10px] sm:text-xs font-bold opacity-50 mb-2 sm:mb-4 tracking-widest text-center">RIGHT CLICK BOARD TO PING TEAMMATES</p>
           {!winner && (
             <>
@@ -385,18 +387,18 @@ export default function SequenceGame() {
                 ))}
               </div>
               {isMyTurn && isDeadCard && (
-                <button onClick={() => {socket.emit('trade_dead_card', {roomId: currentRoom, playerId: playerIdRef.current, deadCard: selectedCard}); setSelectedCard(null)}} className="mt-4 bg-rose-600 px-6 py-2 rounded-full font-bold animate-bounce shadow-lg shadow-rose-500/50 text-white">TRADE DEAD CARD</button>
+                <button onClick={() => {socket.emit('trade_dead_card', {roomId: currentRoom, playerId: playerIdRef.current, deadCard: selectedCard}); setSelectedCard(null)}} className="mt-6 bg-rose-600 px-6 py-2 rounded-full font-bold animate-bounce shadow-lg shadow-rose-500/50 text-white">TRADE DEAD CARD</button>
               )}
             </>
           )}
         </div>
       </div>
 
-      {/* RIGHT: Social Panel */}
-      <div className="w-full md:w-80 lg:w-96 flex flex-col gap-4 min-h-[300px] md:max-h-[100dvh] relative z-10 shrink-0">
+      {/* RIGHT COLUMN: Social Panel - Pinned to right side on desktop */}
+      <div className="w-full md:w-80 lg:w-96 flex flex-col gap-4 min-h-[300px] md:h-full relative z-10 shrink-0">
         <div className="bg-black/40 border border-white/10 rounded-2xl flex-1 flex flex-col overflow-hidden">
           <div className="p-3 border-b border-white/10 font-bold tracking-widest text-xs opacity-70 text-white">COMMUNICATIONS</div>
-          <div className="flex-1 p-3 overflow-y-auto flex flex-col gap-2 text-sm">
+          <div className="chat-scroll-container flex-1 p-3 overflow-y-auto flex flex-col gap-2 text-sm">
             {chats.map((c, i) => (
               <div key={i} className={`p-2 rounded-lg max-w-[90%] text-white ${c.name === playerName ? 'bg-white/20 self-end' : 'bg-black/40 self-start border-l-2'} ${c.team==='red'?'border-rose-500':c.team==='blue'?'border-cyan-500':'border-emerald-500'}`}>
                 <span className="font-bold text-xs opacity-50 block mb-1">{c.name}</span>
@@ -417,6 +419,7 @@ export default function SequenceGame() {
           </div>
         </div>
       </div>
+
     </div>
   );
 }
