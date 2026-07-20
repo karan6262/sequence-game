@@ -16,8 +16,8 @@ const playSound = (type) => {
 const CardVisual = ({ card }) => {
   if (card === 'FREE') {
     return (
-      <div className="absolute inset-0 w-full h-full bg-[#f8f9fa] flex items-center justify-center rounded-[2px] sm:rounded-sm border-[0.5px] border-gray-400">
-        <div className="w-[70%] h-[70%] rounded-full bg-gradient-to-br from-amber-400 to-orange-600 shadow-[inset_0_-3px_6px_rgba(0,0,0,0.4),0_2px_4px_rgba(0,0,0,0.2)]"></div>
+      <div className="absolute inset-0 w-full h-full bg-[#f8f9fa] flex items-center justify-center rounded-[3px] sm:rounded-md border border-gray-400 shadow-sm">
+        <div className="w-[65%] h-[65%] rounded-full bg-gradient-to-br from-amber-400 to-orange-600 shadow-[inset_0_-3px_6px_rgba(0,0,0,0.4),0_2px_4px_rgba(0,0,0,0.2)]"></div>
       </div>
     );
   }
@@ -31,12 +31,14 @@ const CardVisual = ({ card }) => {
   const imageUrl = `https://deckofcardsapi.com/static/img/${apiValue}${suitMap[suit]}.svg`;
 
   return (
-    // "absolute inset-0 w-full h-full object-fill" forces the SVG to stretch to the exact edges of the cell
-    <img 
-      src={imageUrl} 
-      alt={card} 
-      className="absolute inset-0 w-full h-full object-fill rounded-[2px] sm:rounded-sm pointer-events-none drop-shadow-sm"
-      loading="lazy"
+    <div 
+      className="absolute inset-0 w-full h-full bg-white rounded-[3px] sm:rounded-md border border-gray-300 shadow-sm overflow-hidden"
+      style={{
+        backgroundImage: `url(${imageUrl})`,
+        backgroundSize: '100% 100%', // Forces the SVG to completely fill the boundaries of the card!
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      }}
     />
   );
 };
@@ -379,8 +381,9 @@ export default function SequenceGame() {
         </div>
 
         {/* Board Container */}
-        <div className="w-full max-w-[95vw] md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto rounded-xl sm:rounded-[1rem] border border-white/20 shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden shrink-0 bg-white/5 p-[2px] sm:p-1">
-          <div className="grid grid-cols-10 gap-0 sm:gap-[2px] w-full bg-transparent">
+        <div className="w-full max-w-[95vw] md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto rounded-xl sm:rounded-[1rem] border border-white/20 shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden shrink-0 bg-white/5 p-1 sm:p-2">
+          {/* Increased Gap to separate the cards distinctly */}
+          <div className="grid grid-cols-10 gap-[2px] sm:gap-[3px] w-full bg-transparent">
             {BOARD_LAYOUT.map((card, idx) => {
               const chip = boardChips[idx];
               const isWinChip = winningLine.includes(idx);
@@ -389,7 +392,7 @@ export default function SequenceGame() {
 
               return (
                 <div key={idx} onClick={() => handleCellClick(idx)} onContextMenu={(e) => handlePing(e, idx)}
-                     className={`relative aspect-[3/4] flex items-center justify-center ${isMatch?'ring-2 sm:ring-4 ring-cyan-400 z-20 scale-110 cursor-pointer shadow-[0_0_15px_rgba(34,211,238,0.8)] rounded-sm':''} ${winner && !isWinChip ? 'opacity-30' : ''} ${isPung ? 'ring-2 ring-rose-500 animate-pulse rounded-sm' : ''}`}>
+                     className={`relative aspect-[3/4] flex items-center justify-center ${isMatch?'ring-2 sm:ring-4 ring-cyan-400 z-20 scale-110 cursor-pointer shadow-[0_0_15px_rgba(34,211,238,0.8)] rounded-[3px] sm:rounded-md':''} ${winner && !isWinChip ? 'opacity-30' : ''} ${isPung ? 'ring-2 ring-rose-500 animate-pulse rounded-[3px] sm:rounded-md' : ''}`}>
 
                   {isPung && <div className="absolute inset-0 bg-rose-500/40 rounded animate-ping pointer-events-none z-20"></div>}
 
@@ -412,7 +415,7 @@ export default function SequenceGame() {
               <div className="flex -space-x-3 sm:-space-x-4">
                 {(hand || []).map((card, i) => (
                   <div key={i} onClick={() => isMyTurn && setSelectedCard(card)} 
-                       className={`relative w-12 h-16 sm:w-16 sm:h-24 md:w-20 md:h-28 flex items-center justify-center origin-bottom transition-all rounded-[2px] sm:rounded-sm ${selectedCard===card?'ring-2 sm:ring-4 ring-cyan-400 -translate-y-4 sm:-translate-y-6 scale-110 z-20 shadow-[0_0_20px_rgba(34,211,238,0.5)]':'z-0 shadow-lg'} ${isMyTurn?'cursor-pointer hover:-translate-y-2 sm:hover:-translate-y-4':'opacity-50'}`}>
+                       className={`relative w-12 h-16 sm:w-16 sm:h-24 md:w-20 md:h-28 flex items-center justify-center origin-bottom transition-all rounded-[3px] sm:rounded-md ${selectedCard===card?'ring-2 sm:ring-4 ring-cyan-400 -translate-y-4 sm:-translate-y-6 scale-110 z-20 shadow-[0_0_20px_rgba(34,211,238,0.5)]':'z-0 shadow-lg'} ${isMyTurn?'cursor-pointer hover:-translate-y-2 sm:hover:-translate-y-4':'opacity-50'}`}>
                     <CardVisual card={card} />
                   </div>
                 ))}
@@ -425,7 +428,7 @@ export default function SequenceGame() {
         </div>
       </div>
 
-      {/* RIGHT COLUMN: Social Panel - Pinned to right side on desktop */}
+      {/* RIGHT COLUMN: Social Panel */}
       <div className="w-full md:w-80 lg:w-96 flex flex-col gap-4 min-h-[300px] md:h-full relative z-10 shrink-0">
         <div className="bg-black/40 border border-white/10 rounded-2xl flex-1 flex flex-col overflow-hidden shadow-lg">
           <div className="p-3 border-b border-white/10 font-bold tracking-widest text-xs opacity-70 text-white">COMMUNICATIONS</div>
