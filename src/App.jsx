@@ -12,43 +12,35 @@ const playSound = (type) => {
   if (sounds[type] && sounds[type].src) sounds[type].play().catch(() => {});
 };
 
-// --- NEW REALISTIC CARD COMPONENT ---
-const CardVisual = ({ card, type }) => {
+// --- REAL HIGH-QUALITY CARD IMAGES ---
+const CardVisual = ({ card }) => {
   if (card === 'FREE') {
     return (
-      <div className="w-full h-full bg-[#f8f9fa] flex items-center justify-center border border-gray-300 rounded-[2px] sm:rounded-sm">
-        <div className="w-[60%] h-[60%] rounded-full bg-gradient-to-br from-amber-400 to-orange-500 shadow-[inset_0_-2px_4px_rgba(0,0,0,0.3)] drop-shadow-sm"></div>
+      <div className="w-full h-full bg-[#f8f9fa] flex items-center justify-center rounded-[2px] sm:rounded-sm border border-gray-300/50">
+        <div className="w-[65%] h-[65%] rounded-full bg-gradient-to-br from-amber-400 to-orange-600 shadow-[inset_0_-3px_6px_rgba(0,0,0,0.4),0_2px_4px_rgba(0,0,0,0.2)]"></div>
       </div>
     );
   }
 
+  // Convert our format (e.g., "10♠") to the Deck of Cards API format (e.g., "0S")
   const value = card.slice(0, -1);
   const suit = card.slice(-1);
-  const isRed = suit === '♥' || suit === '♦';
-  const textColor = isRed ? 'text-[#e60000]' : 'text-black';
-
-  // Graphic in the center of the card
-  let centerGraphic = suit;
-  if (value === 'K') centerGraphic = '🤴';
-  if (value === 'Q') centerGraphic = '👸';
-  if (value === 'J') centerGraphic = '💂'; 
-
-  const isBoard = type === 'board';
+  const suitMap = { '♠': 'S', '♣': 'C', '♥': 'H', '♦': 'D' };
+  
+  // The API uses '0' for 10s
+  const apiValue = value === '10' ? '0' : value;
+  
+  // Use SVG for infinite crispness on all screen sizes
+  const imageUrl = `https://deckofcardsapi.com/static/img/${apiValue}${suitMap[suit]}.svg`;
 
   return (
-    <div className={`w-full h-full bg-white border border-gray-300 rounded-[2px] sm:rounded-sm flex flex-col relative overflow-hidden ${textColor}`}>
-      {/* Top Left Value & Suit */}
-      <div className={`absolute ${isBoard ? 'top-0 left-[2px] sm:top-[2px] sm:left-1' : 'top-1 left-1 sm:top-2 sm:left-2'} flex flex-col items-center leading-none`}>
-        <span className={`font-bold ${isBoard ? 'text-[8px] sm:text-xs md:text-sm' : 'text-sm sm:text-xl font-black'}`}>{value}</span>
-        <span className={`${isBoard ? 'text-[6px] sm:text-[10px]' : 'text-xs sm:text-sm'}`}>{suit}</span>
-      </div>
-
-      {/* Center Symbol/Character */}
-      <div className="flex-1 flex items-center justify-center w-full h-full pointer-events-none mt-[10%]">
-        <span className={`${isBoard ? 'text-sm sm:text-2xl' : 'text-3xl sm:text-5xl'} opacity-90`}>
-          {centerGraphic}
-        </span>
-      </div>
+    <div className="w-full h-full bg-white flex items-center justify-center overflow-hidden rounded-[2px] sm:rounded-sm shadow-sm">
+      <img 
+        src={imageUrl} 
+        alt={card} 
+        className="w-full h-full object-fill pointer-events-none"
+        loading="lazy"
+      />
     </div>
   );
 };
@@ -258,7 +250,7 @@ export default function SequenceGame() {
   };
 
   const t = {
-    bg: "bg-gradient-to-br from-[#0f5c6e] via-[#1a7f92] to-[#1292a8]" // Updated background to match screenshot vibe
+    bg: "bg-gradient-to-br from-[#0f5c6e] via-[#1a7f92] to-[#1292a8]" 
   };
 
   const getTeamNeon = (team) =>
@@ -268,7 +260,7 @@ export default function SequenceGame() {
     let bg = color === 'red' ? 'bg-gradient-to-br from-rose-500 to-rose-700 ring-1 ring-rose-400' 
            : color === 'blue' ? 'bg-gradient-to-br from-blue-500 to-blue-700 ring-1 ring-blue-400' 
            : 'bg-gradient-to-br from-green-500 to-green-700 ring-1 ring-green-400';
-    return `${bg} shadow-[2px_4px_6px_rgba(0,0,0,0.5)] ${isWin ? 'ring-4 ring-white animate-pulse' : ''}`;
+    return `${bg} shadow-[2px_4px_6px_rgba(0,0,0,0.6)] ${isWin ? 'ring-4 ring-white animate-pulse shadow-[0_0_20px_rgba(255,255,255,1)]' : ''}`;
   };
 
   if (appState === 'lobby' || appState === 'team_select') return (
@@ -379,7 +371,7 @@ export default function SequenceGame() {
         </div>
       )}
 
-      {/* LEFT COLUMN: Game Board & Hand - Scrolls independently on desktop */}
+      {/* LEFT COLUMN: Game Board & Hand */}
       <div className="flex-1 flex flex-col items-center justify-start w-full relative z-10 md:h-full md:overflow-y-auto md:pr-4 pb-12 shrink-0 scroll-smooth">
         
         {/* Desktop Title Bar */}
@@ -391,8 +383,8 @@ export default function SequenceGame() {
         </div>
 
         {/* Board Container */}
-        <div className="w-full max-w-[95vw] md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto rounded-xl sm:rounded-[1rem] border border-white/20 shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden shrink-0 bg-white/5 p-1 sm:p-2">
-          <div className="grid grid-cols-10 gap-[2px] sm:gap-1 w-full bg-transparent">
+        <div className="w-full max-w-[95vw] md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto rounded-xl sm:rounded-[1rem] border border-white/20 shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden shrink-0 bg-white/5 p-[2px] sm:p-1">
+          <div className="grid grid-cols-10 gap-0 sm:gap-[2px] w-full bg-transparent">
             {BOARD_LAYOUT.map((card, idx) => {
               const chip = boardChips[idx];
               const isWinChip = winningLine.includes(idx);
@@ -401,15 +393,15 @@ export default function SequenceGame() {
 
               return (
                 <div key={idx} onClick={() => handleCellClick(idx)} onContextMenu={(e) => handlePing(e, idx)}
-                     className={`relative aspect-[3/4] flex items-center justify-center ${isMatch?'ring-2 sm:ring-4 ring-cyan-400 z-20 scale-110 cursor-pointer shadow-[0_0_15px_rgba(34,211,238,0.8)] rounded':''} ${winner && !isWinChip ? 'opacity-30' : ''} ${isPung ? 'ring-2 ring-rose-500 animate-pulse rounded' : ''}`}>
+                     className={`relative aspect-[3/4] flex items-center justify-center ${isMatch?'ring-2 sm:ring-4 ring-cyan-400 z-20 scale-110 cursor-pointer shadow-[0_0_15px_rgba(34,211,238,0.8)] rounded-sm':''} ${winner && !isWinChip ? 'opacity-30' : ''} ${isPung ? 'ring-2 ring-rose-500 animate-pulse rounded-sm' : ''}`}>
 
                   {isPung && <div className="absolute inset-0 bg-rose-500/40 rounded animate-ping pointer-events-none z-20"></div>}
 
                   {/* Render the realistic card visual */}
-                  <CardVisual card={card} type="board" />
+                  <CardVisual card={card} />
 
                   {/* Render chip on top if exists */}
-                  {chip && <div className={`absolute w-[80%] h-[80%] rounded-full z-10 ${getChipStyle(chip, isWinChip)}`} />}
+                  {chip && <div className={`absolute w-[75%] h-[75%] rounded-full z-10 ${getChipStyle(chip, isWinChip)} pointer-events-none`} />}
                 </div>
               );
             })}
@@ -424,8 +416,8 @@ export default function SequenceGame() {
               <div className="flex -space-x-3 sm:-space-x-4">
                 {(hand || []).map((card, i) => (
                   <div key={i} onClick={() => isMyTurn && setSelectedCard(card)} 
-                       className={`relative w-12 h-16 sm:w-16 sm:h-24 md:w-20 md:h-28 flex items-center justify-center origin-bottom transition-all ${selectedCard===card?'ring-2 sm:ring-4 ring-cyan-400 -translate-y-4 sm:-translate-y-6 scale-110 z-20 rounded shadow-[0_0_20px_rgba(34,211,238,0.5)]':'z-0 shadow-lg'} ${isMyTurn?'cursor-pointer hover:-translate-y-2 sm:hover:-translate-y-4':'opacity-50'}`}>
-                    <CardVisual card={card} type="hand" />
+                       className={`relative w-12 h-16 sm:w-16 sm:h-24 md:w-20 md:h-28 flex items-center justify-center origin-bottom transition-all rounded-[2px] sm:rounded-sm ${selectedCard===card?'ring-2 sm:ring-4 ring-cyan-400 -translate-y-4 sm:-translate-y-6 scale-110 z-20 shadow-[0_0_20px_rgba(34,211,238,0.5)]':'z-0 shadow-lg'} ${isMyTurn?'cursor-pointer hover:-translate-y-2 sm:hover:-translate-y-4':'opacity-50'}`}>
+                    <CardVisual card={card} />
                   </div>
                 ))}
               </div>
