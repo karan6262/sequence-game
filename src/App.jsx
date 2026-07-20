@@ -12,7 +12,17 @@ const playSound = (type) => {
   if (sounds[type] && sounds[type].src) sounds[type].play().catch(() => {});
 };
 
-// --- REAL HIGH-QUALITY CARD IMAGES (PNG FIX) ---
+// Custom CSS Animation for the chip dropping physically onto the board
+const chipAnimationStyles = `
+  @keyframes chipDrop {
+    0% { transform: scale(2) translateY(-20px); opacity: 0; box-shadow: 0 20px 20px rgba(0,0,0,0.6); }
+    100% { transform: scale(1) translateY(0); opacity: 1; }
+  }
+  .chip-drop {
+    animation: chipDrop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  }
+`;
+
 const CardVisual = ({ card }) => {
   if (card === 'FREE') {
     return (
@@ -25,26 +35,15 @@ const CardVisual = ({ card }) => {
   const value = card.slice(0, -1);
   const suit = card.slice(-1);
   const suitMap = { '♠': 'S', '♣': 'C', '♥': 'H', '♦': 'D' };
-  
-  // The API uses '0' for 10s
   const apiValue = value === '10' ? '0' : value;
-  
-  // SWITCHED TO .png TO FIX THE SCALING BUG
   const imageUrl = `https://deckofcardsapi.com/static/img/${apiValue}${suitMap[suit]}.png`;
 
   return (
     <div className="absolute inset-0 w-full h-full bg-white rounded-[3px] sm:rounded-md border border-gray-300 shadow-sm overflow-hidden">
-      <img 
-        src={imageUrl} 
-        alt={card} 
-        // object-fill forces the PNG to stretch perfectly to the container's edges
-        className="w-full h-full object-fill pointer-events-none" 
-        loading="lazy"
-      />
+      <img src={imageUrl} alt={card} className="w-full h-full object-fill pointer-events-none" loading="lazy" />
     </div>
   );
 };
-// ------------------------------------
 
 export default function SequenceGame() {
 
@@ -68,6 +67,7 @@ export default function SequenceGame() {
 
   const [hostId, setHostId] = useState(null);
   const [turnDeadline, setTurnDeadline] = useState(0);
+  const [lastMoveIndex, setLastMoveIndex] = useState(null); // NEW: Track Last Move
 
   const [myTeam, setMyTeam] = useState('');
   const [hand, setHand] = useState([]);
@@ -113,6 +113,7 @@ export default function SequenceGame() {
       setWinningLine(gameState.winningLine || []);
       setHostId(gameState.hostId);
       setTurnDeadline(gameState.turnDeadline || 0);
+      setLastMoveIndex(gameState.lastMoveIndex); // Apply the last move
 
       if (gameState.winner && !winner) {
         playSound('win');
@@ -147,6 +148,7 @@ export default function SequenceGame() {
       setWinner(null);
       setWinningLine([]);
       setActivePings({});
+      setLastMoveIndex(null);
       if (allHands && allHands[playerIdRef.current]) {
         setHand(allHands[playerIdRef.current]);
         setSelectedCard(null);
@@ -249,26 +251,27 @@ export default function SequenceGame() {
     window.location.reload();
   };
 
-  const t = {
-    bg: "bg-gradient-to-br from-[#0f5c6e] via-[#1a7f92] to-[#1292a8]" 
-  };
+  const t = { bg: "bg-gradient-to-br from-[#0f5c6e] via-[#1a7f92] to-[#1292a8]" };
 
   const getTeamNeon = (team) =>
     team === 'red' ? 'text-rose-400' : team === 'blue' ? 'text-blue-300' : team === 'green' ? 'text-green-400' : 'text-gray-300';
 
-  const getChipStyle = (color, isWin) => {
+  const getChipStyle = (color, isWin, isLast) => {
     let bg = color === 'red' ? 'bg-gradient-to-br from-rose-500 to-rose-700 ring-1 ring-rose-400' 
            : color === 'blue' ? 'bg-gradient-to-br from-blue-500 to-blue-700 ring-1 ring-blue-400' 
            : 'bg-gradient-to-br from-green-500 to-green-700 ring-1 ring-green-400';
-    return `${bg} shadow-[2px_4px_6px_rgba(0,0,0,0.6)] ${isWin ? 'ring-4 ring-white animate-pulse shadow-[0_0_20px_rgba(255,255,255,1)]' : ''}`;
+           
+    // Add the glowing yellow pulse if it was the last move made
+    let highlight = isLast && !isWin ? 'ring-[3px] ring-yellow-400 shadow-[0_0_20px_rgba(250,204,21,1)] z-30 chip-drop' : '';
+    let winGlow = isWin ? 'ring-4 ring-white animate-pulse shadow-[0_0_20px_rgba(255,255,255,1)] z-30' : '';
+    
+    return `${bg} shadow-[2px_4px_6px_rgba(0,0,0,0.6)] ${highlight} ${winGlow}`;
   };
 
   if (appState === 'lobby' || appState === 'team_select') return (
     <div className={`min-h-[100dvh] w-full ${t.bg} text-white flex flex-col items-center justify-center p-2 sm:p-6 overflow-hidden font-sans`}>
        <div className="mb-4">
-         <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-300 tracking-[0.2em]">
-           SEQUENCE
-         </h2>
+         <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-300 tracking-[0.2em]">SEQUENCE</h2>
        </div>
 
        <div className="bg-black/30 backdrop-blur-md p-8 rounded-3xl border border-white/10 shadow-2xl w-full max-w-2xl text-center z-10">
@@ -307,6 +310,7 @@ export default function SequenceGame() {
 
   return (
     <div className={`min-h-[100dvh] md:h-[100dvh] overflow-y-auto md:overflow-hidden ${t.bg} text-white flex flex-col md:flex-row p-2 sm:p-4 gap-4 font-sans relative`}>
+      <style>{chipAnimationStyles}</style>
 
       {/* WAITING TO START OVERLAY */}
       {!isGameStarted && !winner && (
@@ -374,7 +378,6 @@ export default function SequenceGame() {
       {/* LEFT COLUMN: Game Board & Hand */}
       <div className="flex-1 flex flex-col items-center justify-start w-full relative z-10 md:h-full md:overflow-y-auto md:pr-4 pb-12 shrink-0 scroll-smooth">
         
-        {/* Desktop Title Bar */}
         <div className="w-full flex justify-between bg-black/40 border border-white/10 p-2 sm:p-3 rounded-xl sm:rounded-2xl mt-2 mb-4 shadow-sm backdrop-blur-md shrink-0">
            <div className={`font-black tracking-widest text-xs sm:text-base ${isGameStarted ? getTeamNeon(currentTurn) : 'text-slate-500'}`}>
              {winner ? 'MATCH COMPLETE' : isGameStarted ? `${activePlayerName}'S TURN` : 'STANDBY...'}
@@ -382,13 +385,13 @@ export default function SequenceGame() {
            <div className="font-bold text-xs sm:text-base opacity-70 tracking-widest">SEQUENCE CLASSIC</div>
         </div>
 
-        {/* Board Container */}
         <div className="w-full max-w-[95vw] md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto rounded-xl sm:rounded-[1rem] border border-white/20 shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden shrink-0 bg-white/5 p-1 sm:p-2">
           <div className="grid grid-cols-10 gap-[2px] sm:gap-[3px] w-full bg-transparent">
             {BOARD_LAYOUT.map((card, idx) => {
               const chip = boardChips[idx];
               const isWinChip = winningLine.includes(idx);
               const isPung = activePings[idx];
+              const isLastMove = lastMoveIndex === idx; 
               const isMatch = isMyTurn && selectedCard && ((card === selectedCard && !chip) || (selectedCard.includes('J') && ((selectedCard.includes('♦')||selectedCard.includes('♣'))?!chip:chip&&chip!==myTeam)));
 
               return (
@@ -397,18 +400,21 @@ export default function SequenceGame() {
 
                   {isPung && <div className="absolute inset-0 bg-rose-500/40 rounded animate-ping pointer-events-none z-20"></div>}
 
-                  {/* Render the realistic card visual */}
                   <CardVisual card={card} />
 
-                  {/* Render chip on top if exists */}
-                  {chip && <div className={`absolute w-[75%] h-[75%] rounded-full z-10 ${getChipStyle(chip, isWinChip)} pointer-events-none`} />}
+                  {/* Render dropping chip if it exists */}
+                  {chip && (
+                    <div 
+                      key={`chip-${idx}-${chip}`} // Forces re-render animation if chip changes
+                      className={`absolute w-[75%] h-[75%] rounded-full z-10 ${getChipStyle(chip, isWinChip, isLastMove)} pointer-events-none`} 
+                    />
+                  )}
                 </div>
               );
             })}
           </div>
         </div>
 
-        {/* Player Hand Container */}
         <div className="w-full mt-4 sm:mt-8 flex flex-col items-center shrink-0">
           <p className="text-[10px] sm:text-xs font-bold opacity-70 mb-2 sm:mb-4 tracking-widest text-center">RIGHT CLICK BOARD TO PING TEAMMATES</p>
           {!winner && (
