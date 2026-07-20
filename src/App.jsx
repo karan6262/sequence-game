@@ -12,36 +12,32 @@ const playSound = (type) => {
   if (sounds[type] && sounds[type].src) sounds[type].play().catch(() => {});
 };
 
-// --- REAL HIGH-QUALITY CARD IMAGES ---
+// --- REAL HIGH-QUALITY CARD IMAGES (FIXED SIZING) ---
 const CardVisual = ({ card }) => {
   if (card === 'FREE') {
     return (
-      <div className="w-full h-full bg-[#f8f9fa] flex items-center justify-center rounded-[2px] sm:rounded-sm border border-gray-300/50">
-        <div className="w-[65%] h-[65%] rounded-full bg-gradient-to-br from-amber-400 to-orange-600 shadow-[inset_0_-3px_6px_rgba(0,0,0,0.4),0_2px_4px_rgba(0,0,0,0.2)]"></div>
+      <div className="absolute inset-0 w-full h-full bg-[#f8f9fa] flex items-center justify-center rounded-[2px] sm:rounded-sm border-[0.5px] border-gray-400">
+        <div className="w-[70%] h-[70%] rounded-full bg-gradient-to-br from-amber-400 to-orange-600 shadow-[inset_0_-3px_6px_rgba(0,0,0,0.4),0_2px_4px_rgba(0,0,0,0.2)]"></div>
       </div>
     );
   }
 
-  // Convert our format (e.g., "10♠") to the Deck of Cards API format (e.g., "0S")
   const value = card.slice(0, -1);
   const suit = card.slice(-1);
   const suitMap = { '♠': 'S', '♣': 'C', '♥': 'H', '♦': 'D' };
   
   // The API uses '0' for 10s
   const apiValue = value === '10' ? '0' : value;
-  
-  // Use SVG for infinite crispness on all screen sizes
   const imageUrl = `https://deckofcardsapi.com/static/img/${apiValue}${suitMap[suit]}.svg`;
 
   return (
-    <div className="w-full h-full bg-white flex items-center justify-center overflow-hidden rounded-[2px] sm:rounded-sm shadow-sm">
-      <img 
-        src={imageUrl} 
-        alt={card} 
-        className="w-full h-full object-fill pointer-events-none"
-        loading="lazy"
-      />
-    </div>
+    // "absolute inset-0 w-full h-full object-fill" forces the SVG to stretch to the exact edges of the cell
+    <img 
+      src={imageUrl} 
+      alt={card} 
+      className="absolute inset-0 w-full h-full object-fill rounded-[2px] sm:rounded-sm pointer-events-none drop-shadow-sm"
+      loading="lazy"
+    />
   );
 };
 // ------------------------------------
