@@ -12,6 +12,48 @@ const playSound = (type) => {
   if (sounds[type] && sounds[type].src) sounds[type].play().catch(() => {});
 };
 
+// --- NEW REALISTIC CARD COMPONENT ---
+const CardVisual = ({ card, type }) => {
+  if (card === 'FREE') {
+    return (
+      <div className="w-full h-full bg-[#f8f9fa] flex items-center justify-center border border-gray-300 rounded-[2px] sm:rounded-sm">
+        <div className="w-[60%] h-[60%] rounded-full bg-gradient-to-br from-amber-400 to-orange-500 shadow-[inset_0_-2px_4px_rgba(0,0,0,0.3)] drop-shadow-sm"></div>
+      </div>
+    );
+  }
+
+  const value = card.slice(0, -1);
+  const suit = card.slice(-1);
+  const isRed = suit === '♥' || suit === '♦';
+  const textColor = isRed ? 'text-[#e60000]' : 'text-black';
+
+  // Graphic in the center of the card
+  let centerGraphic = suit;
+  if (value === 'K') centerGraphic = '🤴';
+  if (value === 'Q') centerGraphic = '👸';
+  if (value === 'J') centerGraphic = '💂'; 
+
+  const isBoard = type === 'board';
+
+  return (
+    <div className={`w-full h-full bg-white border border-gray-300 rounded-[2px] sm:rounded-sm flex flex-col relative overflow-hidden ${textColor}`}>
+      {/* Top Left Value & Suit */}
+      <div className={`absolute ${isBoard ? 'top-0 left-[2px] sm:top-[2px] sm:left-1' : 'top-1 left-1 sm:top-2 sm:left-2'} flex flex-col items-center leading-none`}>
+        <span className={`font-bold ${isBoard ? 'text-[8px] sm:text-xs md:text-sm' : 'text-sm sm:text-xl font-black'}`}>{value}</span>
+        <span className={`${isBoard ? 'text-[6px] sm:text-[10px]' : 'text-xs sm:text-sm'}`}>{suit}</span>
+      </div>
+
+      {/* Center Symbol/Character */}
+      <div className="flex-1 flex items-center justify-center w-full h-full pointer-events-none mt-[10%]">
+        <span className={`${isBoard ? 'text-sm sm:text-2xl' : 'text-3xl sm:text-5xl'} opacity-90`}>
+          {centerGraphic}
+        </span>
+      </div>
+    </div>
+  );
+};
+// ------------------------------------
+
 export default function SequenceGame() {
 
   const [avatar, setAvatar] = useState('😎');
@@ -216,31 +258,29 @@ export default function SequenceGame() {
   };
 
   const t = {
-    bg: "bg-gradient-to-br from-pink-400 via-yellow-400 to-orange-400",
-    card: "bg-white/90 border border-gray-200/50 shadow-lg hover:shadow-xl transition-all duration-300",
-    boardBg: "bg-white/80 border border-gray-300/30",
-    freeCell: "bg-yellow-200/50 border border-yellow-400/50",
-    regCell: "bg-white/30 border border-gray-200/30",
+    bg: "bg-gradient-to-br from-[#0f5c6e] via-[#1a7f92] to-[#1292a8]" // Updated background to match screenshot vibe
   };
 
   const getTeamNeon = (team) =>
-    team === 'red' ? 'text-rose-600' : team === 'blue' ? 'text-blue-600' : team === 'green' ? 'text-green-600' : 'text-gray-600';
+    team === 'red' ? 'text-rose-400' : team === 'blue' ? 'text-blue-300' : team === 'green' ? 'text-green-400' : 'text-gray-300';
 
   const getChipStyle = (color, isWin) => {
-    let bg = color === 'red' ? 'bg-gradient-to-br from-rose-400 to-rose-600' : color === 'blue' ? 'bg-gradient-to-br from-blue-400 to-blue-600' : 'bg-gradient-to-br from-green-400 to-green-600';
-    return `${bg} shadow-lg ${isWin ? 'ring-2 ring-white/50' : ''}`;
+    let bg = color === 'red' ? 'bg-gradient-to-br from-rose-500 to-rose-700 ring-1 ring-rose-400' 
+           : color === 'blue' ? 'bg-gradient-to-br from-blue-500 to-blue-700 ring-1 ring-blue-400' 
+           : 'bg-gradient-to-br from-green-500 to-green-700 ring-1 ring-green-400';
+    return `${bg} shadow-[2px_4px_6px_rgba(0,0,0,0.5)] ${isWin ? 'ring-4 ring-white animate-pulse' : ''}`;
   };
 
   if (appState === 'lobby' || appState === 'team_select') return (
-    <div className={`min-h-[100dvh] w-full ${t.bg} text-gray-900 flex flex-col items-center justify-center p-2 sm:p-6 overflow-hidden font-sans`}>
+    <div className={`min-h-[100dvh] w-full ${t.bg} text-white flex flex-col items-center justify-center p-2 sm:p-6 overflow-hidden font-sans`}>
        <div className="mb-4">
-         <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-500 via-yellow-400 to-orange-500">
+         <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-300 tracking-[0.2em]">
            SEQUENCE
          </h2>
        </div>
 
-       <div className="bg-white/20 backdrop-blur-md p-8 rounded-3xl shadow-2xl w-full max-w-2xl text-center z-10">
-          <h1 className="text-5xl font-bold text-gray-800 mb-8">SEQUENCE</h1>
+       <div className="bg-black/30 backdrop-blur-md p-8 rounded-3xl border border-white/10 shadow-2xl w-full max-w-2xl text-center z-10">
+          <h1 className="text-5xl font-bold text-white mb-8 tracking-[0.2em]">SEQUENCE</h1>
 
           {appState === 'lobby' ? (
             <form onSubmit={handleJoinRoom} className="flex flex-col gap-4 max-w-md mx-auto">
@@ -251,15 +291,15 @@ export default function SequenceGame() {
               </div>
               <input type="text" placeholder="Name" value={playerName} onChange={e=>setPlayerName(e.target.value)} className="w-full p-4 bg-black/50 border border-white/10 rounded-xl text-center font-bold text-white" required />
               <input type="text" placeholder="Room Code" value={roomInput} onChange={e=>setRoomInput(e.target.value)} className="w-full p-4 bg-black/50 border border-white/10 rounded-xl text-center font-bold uppercase text-white" required />
-              <button className="bg-gradient-to-r from-pink-500 via-yellow-500 to-orange-500 text-white font-bold py-4 rounded-xl mt-4 hover:scale-105 transition-transform active:scale-95">JOIN SQUAD</button>
+              <button className="bg-white text-black font-black py-4 rounded-xl mt-4 hover:scale-105 transition-transform active:scale-95">JOIN SQUAD</button>
             </form>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {['red','blue','green'].map(color => (
-                <div key={color} className="flex flex-col gap-2 border border-white/10 p-4 rounded-2xl bg-black/20">
+                <div key={color} className="flex flex-col gap-2 border border-white/10 p-4 rounded-2xl bg-black/40">
                   <h3 className={`font-black text-xl uppercase ${getTeamNeon(color)}`}>{color}</h3>
                   <div className="text-sm font-bold opacity-70 mb-4 h-16">{roomInfo[color]?.join(', ') || 'Empty'}</div>
-                  <button onClick={() => socket.emit('join_team', {roomId: currentRoom, teamColor: color, playerId: playerIdRef.current})} disabled={roomInfo[color]?.length >= 4} className="bg-white/10 py-2 rounded-lg font-bold hover:bg-white/20 transition-colors text-white transform active:scale-95">
+                  <button onClick={() => socket.emit('join_team', {roomId: currentRoom, teamColor: color, playerId: playerIdRef.current})} disabled={roomInfo[color]?.length >= 4} className="bg-white/20 py-2 rounded-lg font-bold hover:bg-white/30 transition-colors text-white transform active:scale-95">
                     JOIN TEAM
                   </button>
                 </div>
@@ -274,8 +314,7 @@ export default function SequenceGame() {
   const isDeadCard = selectedCard && checkDeadCard(selectedCard);
 
   return (
-    // On Mobile: Single scrolling page (overflow-y-auto). On Desktop: Fixed screen height (md:h-[100dvh]) with independent columns.
-    <div className={`min-h-[100dvh] md:h-[100dvh] overflow-y-auto md:overflow-hidden ${t.bg} text-gray-900 flex flex-col md:flex-row p-2 sm:p-4 gap-4 font-sans relative`}>
+    <div className={`min-h-[100dvh] md:h-[100dvh] overflow-y-auto md:overflow-hidden ${t.bg} text-white flex flex-col md:flex-row p-2 sm:p-4 gap-4 font-sans relative`}>
 
       {/* WAITING TO START OVERLAY */}
       {!isGameStarted && !winner && (
@@ -322,7 +361,7 @@ export default function SequenceGame() {
           </div>
 
           {playerIdRef.current === hostId && (
-            <button onClick={() => socket.emit('start_game', currentRoom)} className="shrink-0 bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-black py-4 px-12 rounded-2xl shadow-[0_0_30px_rgba(34,211,238,0.4)] hover:scale-110 transition-transform text-xl sm:text-2xl active:scale-105">
+            <button onClick={() => socket.emit('start_game', currentRoom)} className="shrink-0 bg-white text-black font-black py-4 px-12 rounded-2xl shadow-[0_0_30px_rgba(255,255,255,0.4)] hover:scale-110 transition-transform text-xl sm:text-2xl active:scale-105 tracking-widest">
               START MATCH
             </button>
           )}
@@ -348,12 +387,12 @@ export default function SequenceGame() {
            <div className={`font-black tracking-widest text-xs sm:text-base ${isGameStarted ? getTeamNeon(currentTurn) : 'text-slate-500'}`}>
              {winner ? 'MATCH COMPLETE' : isGameStarted ? `${activePlayerName}'S TURN` : 'STANDBY...'}
            </div>
-           <div className="font-bold text-xs sm:text-base text-gray-300">THEME: PLAYFUL</div>
+           <div className="font-bold text-xs sm:text-base opacity-70 tracking-widest">SEQUENCE CLASSIC</div>
         </div>
 
         {/* Board Container */}
-        <div className={`w-full max-w-[95vw] md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto p-1 sm:p-2 rounded-xl sm:rounded-[2rem] border transition-all shrink-0 ${t.boardBg}`}>
-          <div className="grid grid-cols-10 gap-[2px] sm:gap-1 w-full">
+        <div className="w-full max-w-[95vw] md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto rounded-xl sm:rounded-[1rem] border border-white/20 shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden shrink-0 bg-white/5 p-1 sm:p-2">
+          <div className="grid grid-cols-10 gap-[2px] sm:gap-1 w-full bg-transparent">
             {BOARD_LAYOUT.map((card, idx) => {
               const chip = boardChips[idx];
               const isWinChip = winningLine.includes(idx);
@@ -362,12 +401,15 @@ export default function SequenceGame() {
 
               return (
                 <div key={idx} onClick={() => handleCellClick(idx)} onContextMenu={(e) => handlePing(e, idx)}
-                     className={`relative aspect-[3/4] rounded flex items-center justify-center ${card==='FREE'?t.freeCell:t.regCell} ${isMatch?'ring-2 sm:ring-4 ring-white z-10 scale-110 cursor-pointer shadow-xl':''} ${winner && !isWinChip ? 'opacity-30' : ''} ${isPung ? 'ring-2 ring-rose-500 animate-pulse' : ''}`}>
+                     className={`relative aspect-[3/4] flex items-center justify-center ${isMatch?'ring-2 sm:ring-4 ring-cyan-400 z-20 scale-110 cursor-pointer shadow-[0_0_15px_rgba(34,211,238,0.8)] rounded':''} ${winner && !isWinChip ? 'opacity-30' : ''} ${isPung ? 'ring-2 ring-rose-500 animate-pulse rounded' : ''}`}>
 
-                  {isPung && <div className="absolute inset-0 bg-rose-500/40 rounded animate-ping pointer-events-none"></div>}
+                  {isPung && <div className="absolute inset-0 bg-rose-500/40 rounded animate-ping pointer-events-none z-20"></div>}
 
-                  {card!=='FREE' && <span className={`font-black text-[10px] sm:text-xs md:text-sm ${card.includes('♥')||card.includes('♦')?'text-red-600':'text-black'}`}>{card}</span>}
-                  {chip && <div className={`absolute w-[70%] h-[70%] rounded-full ${getChipStyle(chip, isWinChip)}`} />}
+                  {/* Render the realistic card visual */}
+                  <CardVisual card={card} type="board" />
+
+                  {/* Render chip on top if exists */}
+                  {chip && <div className={`absolute w-[80%] h-[80%] rounded-full z-10 ${getChipStyle(chip, isWinChip)}`} />}
                 </div>
               );
             })}
@@ -376,18 +418,19 @@ export default function SequenceGame() {
 
         {/* Player Hand Container */}
         <div className="w-full mt-4 sm:mt-8 flex flex-col items-center shrink-0">
-          <p className="text-[10px] sm:text-xs font-bold opacity-50 mb-2 sm:mb-4 tracking-widest text-center">RIGHT CLICK BOARD TO PING TEAMMATES</p>
+          <p className="text-[10px] sm:text-xs font-bold opacity-70 mb-2 sm:mb-4 tracking-widest text-center">RIGHT CLICK BOARD TO PING TEAMMATES</p>
           {!winner && (
             <>
               <div className="flex -space-x-3 sm:-space-x-4">
                 {(hand || []).map((card, i) => (
-                  <div key={i} onClick={() => isMyTurn && setSelectedCard(card)} className={`relative w-12 h-16 sm:w-16 sm:h-24 md:w-20 md:h-28 ${t.card} rounded-md sm:rounded-lg flex items-center justify-center origin-bottom transition-all ${selectedCard===card?'ring-2 sm:ring-4 ring-white -translate-y-4 sm:-translate-y-6 scale-110 z-20':'z-0'} ${isMyTurn?'cursor-pointer hover:-translate-y-2 sm:hover:-translate-y-4':'opacity-50'}`}>
-                    <span className={`font-black text-base sm:text-xl md:text-2xl ${card.includes('♥')||card.includes('♦')?'text-red-600':'text-black'}`}>{card}</span>
+                  <div key={i} onClick={() => isMyTurn && setSelectedCard(card)} 
+                       className={`relative w-12 h-16 sm:w-16 sm:h-24 md:w-20 md:h-28 flex items-center justify-center origin-bottom transition-all ${selectedCard===card?'ring-2 sm:ring-4 ring-cyan-400 -translate-y-4 sm:-translate-y-6 scale-110 z-20 rounded shadow-[0_0_20px_rgba(34,211,238,0.5)]':'z-0 shadow-lg'} ${isMyTurn?'cursor-pointer hover:-translate-y-2 sm:hover:-translate-y-4':'opacity-50'}`}>
+                    <CardVisual card={card} type="hand" />
                   </div>
                 ))}
               </div>
               {isMyTurn && isDeadCard && (
-                <button onClick={() => {socket.emit('trade_dead_card', {roomId: currentRoom, playerId: playerIdRef.current, deadCard: selectedCard}); setSelectedCard(null)}} className="mt-6 bg-rose-600 px-6 py-2 rounded-full font-bold animate-bounce shadow-lg shadow-rose-500/50 text-white">TRADE DEAD CARD</button>
+                <button onClick={() => {socket.emit('trade_dead_card', {roomId: currentRoom, playerId: playerIdRef.current, deadCard: selectedCard}); setSelectedCard(null)}} className="mt-6 bg-rose-600 px-6 py-2 rounded-full font-bold animate-bounce shadow-lg shadow-rose-500/50 text-white border border-rose-400">TRADE DEAD CARD</button>
               )}
             </>
           )}
@@ -396,7 +439,7 @@ export default function SequenceGame() {
 
       {/* RIGHT COLUMN: Social Panel - Pinned to right side on desktop */}
       <div className="w-full md:w-80 lg:w-96 flex flex-col gap-4 min-h-[300px] md:h-full relative z-10 shrink-0">
-        <div className="bg-black/40 border border-white/10 rounded-2xl flex-1 flex flex-col overflow-hidden">
+        <div className="bg-black/40 border border-white/10 rounded-2xl flex-1 flex flex-col overflow-hidden shadow-lg">
           <div className="p-3 border-b border-white/10 font-bold tracking-widest text-xs opacity-70 text-white">COMMUNICATIONS</div>
           <div className="chat-scroll-container flex-1 p-3 overflow-y-auto flex flex-col gap-2 text-sm">
             {chats.map((c, i) => (
@@ -412,7 +455,7 @@ export default function SequenceGame() {
           </form>
         </div>
 
-        <div className="h-48 bg-black/40 border border-white/10 rounded-2xl flex flex-col overflow-hidden">
+        <div className="h-48 bg-black/40 border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-lg">
           <div className="p-3 border-b border-white/10 font-bold tracking-widest text-xs opacity-70 text-white">ACTION LOG</div>
           <div className="flex-1 p-3 overflow-y-auto flex flex-col gap-1 text-xs opacity-80 text-white">
             {logs.map((log, i) => <div key={i} className="border-b border-white/5 pb-1">⚡ {log}</div>)}
