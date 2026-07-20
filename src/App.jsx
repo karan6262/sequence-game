@@ -12,7 +12,7 @@ const playSound = (type) => {
   if (sounds[type] && sounds[type].src) sounds[type].play().catch(() => {});
 };
 
-// --- REAL HIGH-QUALITY CARD IMAGES (FIXED SIZING) ---
+// --- REAL HIGH-QUALITY CARD IMAGES (PNG FIX) ---
 const CardVisual = ({ card }) => {
   if (card === 'FREE') {
     return (
@@ -28,18 +28,20 @@ const CardVisual = ({ card }) => {
   
   // The API uses '0' for 10s
   const apiValue = value === '10' ? '0' : value;
-  const imageUrl = `https://deckofcardsapi.com/static/img/${apiValue}${suitMap[suit]}.svg`;
+  
+  // SWITCHED TO .png TO FIX THE SCALING BUG
+  const imageUrl = `https://deckofcardsapi.com/static/img/${apiValue}${suitMap[suit]}.png`;
 
   return (
-    <div 
-      className="absolute inset-0 w-full h-full bg-white rounded-[3px] sm:rounded-md border border-gray-300 shadow-sm overflow-hidden"
-      style={{
-        backgroundImage: `url(${imageUrl})`,
-        backgroundSize: '100% 100%', // Forces the SVG to completely fill the boundaries of the card!
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat'
-      }}
-    />
+    <div className="absolute inset-0 w-full h-full bg-white rounded-[3px] sm:rounded-md border border-gray-300 shadow-sm overflow-hidden">
+      <img 
+        src={imageUrl} 
+        alt={card} 
+        // object-fill forces the PNG to stretch perfectly to the container's edges
+        className="w-full h-full object-fill pointer-events-none" 
+        loading="lazy"
+      />
+    </div>
   );
 };
 // ------------------------------------
@@ -382,7 +384,6 @@ export default function SequenceGame() {
 
         {/* Board Container */}
         <div className="w-full max-w-[95vw] md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto rounded-xl sm:rounded-[1rem] border border-white/20 shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden shrink-0 bg-white/5 p-1 sm:p-2">
-          {/* Increased Gap to separate the cards distinctly */}
           <div className="grid grid-cols-10 gap-[2px] sm:gap-[3px] w-full bg-transparent">
             {BOARD_LAYOUT.map((card, idx) => {
               const chip = boardChips[idx];
