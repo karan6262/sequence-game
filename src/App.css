@@ -1,518 +1,184 @@
-import React, { useState, useEffect, useRef } from 'react';
-import io from 'socket.io-client';
-import confetti from 'canvas-confetti';
-import { BOARD_LAYOUT } from './constants';
+.counter {
+  font-size: 16px;
+  padding: 5px 10px;
+  border-radius: 5px;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border: 2px solid transparent;
+  transition: border-color 0.3s;
+  margin-bottom: 24px;
 
-const socket = io.connect(import.meta.env.VITE_SERVER_URL || 'https://sequence-server-g51u.onrender.com');
-
-const AVATARS = ['😎', '🦊', '🦁', '🦄', '👽', '💀', '🤖', '👑'];
-
-const playSound = (type) => {
-  const sounds = { play: new Audio(''), remove: new Audio(''), win: new Audio(''), chat: new Audio('') };
-  if (sounds[type] && sounds[type].src) sounds[type].play().catch(() => {});
-};
-
-const chipAnimationStyles = `
-  @keyframes chipDrop {
-    0% { transform: scale(2) translateY(-20px); opacity: 0; box-shadow: 0 20px 20px rgba(0,0,0,0.6); }
-    100% { transform: scale(1) translateY(0); opacity: 1; }
+  &:hover {
+    border-color: var(--accent-border);
   }
-  .chip-drop {
-    animation: chipDrop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
-  @keyframes drawLine {
-    from { stroke-dashoffset: 100; }
-    to { stroke-dashoffset: 0; }
-  }
-  .winning-line {
-    stroke-dasharray: 100;
-    stroke-dashoffset: 100;
-    animation: drawLine 1s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-  }
-`;
+}
 
-// --- REAL HIGH-QUALITY CARD IMAGES ---
-const CardVisual = ({ card }) => {
-  if (card === 'FREE') {
-    return (
-      <div className="absolute inset-0 w-full h-full bg-[#f8f9fa] flex items-center justify-center rounded-[3px] sm:rounded-md border border-gray-400 shadow-sm overflow-hidden">
-        <div className="w-[85%] aspect-square rounded-full bg-[#e65c00] flex items-center justify-center shadow-[inset_0_-3px_5px_rgba(0,0,0,0.3),0_2px_4px_rgba(0,0,0,0.3)] border-[1px] border-[#ff7a29]">
-           <span className="text-white font-black text-[4.5px] sm:text-[6.5px] md:text-[8px] lg:text-[10px] tracking-tight drop-shadow-[0_1px_1px_rgba(0,0,0,0.6)] rotate-[-40deg] select-none">
-             SEQUENCE
-           </span>
-        </div>
-      </div>
-    );
+.hero {
+  position: relative;
+
+  .base,
+  .framework,
+  .vite {
+    inset-inline: 0;
+    margin: 0 auto;
   }
 
-  const value = card.slice(0, -1);
-  const suit = card.slice(-1);
-  const suitMap = { '♠': 'S', '♣': 'C', '♥': 'H', '♦': 'D' };
-  
-  const apiValue = value === '10' ? '0' : value;
-  const imageUrl = `https://deckofcardsapi.com/static/img/${apiValue}${suitMap[suit]}.png`;
+  .base {
+    width: 170px;
+    position: relative;
+    z-index: 0;
+  }
 
-  return (
-    <div className="absolute inset-0 w-full h-full bg-white rounded-[3px] sm:rounded-md border border-gray-300 shadow-sm overflow-hidden">
-      <img 
-        src={imageUrl} 
-        alt={card} 
-        className="w-full h-full object-fill pointer-events-none" 
-        loading="lazy"
-      />
-    </div>
-  );
-};
+  .framework,
+  .vite {
+    position: absolute;
+  }
 
-export default function SequenceGame() {
+  .framework {
+    z-index: 1;
+    top: 34px;
+    height: 28px;
+    transform: perspective(2000px) rotateZ(300deg) rotateX(44deg) rotateY(39deg)
+      scale(1.4);
+  }
 
-  const [avatar, setAvatar] = useState('😎');
-  const playerIdRef = useRef(null);
+  .vite {
+    z-index: 0;
+    top: 107px;
+    height: 26px;
+    width: auto;
+    transform: perspective(2000px) rotateZ(300deg) rotateX(40deg) rotateY(39deg)
+      scale(0.8);
+  }
+}
 
-  const [appState, setAppState] = useState('lobby');
-  const [roomInput, setRoomInput] = useState('');
-  const [playerName, setPlayerName] = useState('');
-  const [currentRoom, setCurrentRoom] = useState(null);
-  const [roomInfo, setRoomInfo] = useState({ red: [], blue: [], green: [], unassigned: [], total: 0 });
+#center {
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+  place-content: center;
+  place-items: center;
+  flex-grow: 1;
 
-  const [boardChips, setBoardChips] = useState(Array(100).fill(null));
-  const [currentTurn, setCurrentTurn] = useState('red');
-  const [winner, setWinner] = useState(null);
-  const [winningLine, setWinningLine] = useState([]);
-  const [isGameStarted, setIsGameStarted] = useState(false);
-  const [activePlayerId, setActivePlayerId] = useState(null);
-  const [activePlayerName, setActivePlayerName] = useState('Waiting...');
-  const [timeLeft, setTimeLeft] = useState(60);
+  @media (max-width: 1024px) {
+    padding: 32px 20px 24px;
+    gap: 18px;
+  }
+}
 
-  const [hostId, setHostId] = useState(null);
-  const [turnDeadline, setTurnDeadline] = useState(0);
-  const [lastMoveIndex, setLastMoveIndex] = useState(null);
+#next-steps {
+  display: flex;
+  border-top: 1px solid var(--border);
+  text-align: left;
 
-  const [myTeam, setMyTeam] = useState('');
-  const [hand, setHand] = useState([]);
-  const [selectedCard, setSelectedCard] = useState(null);
-
-  const [logs, setLogs] = useState([]);
-  const [chatInput, setChatInput] = useState('');
-  const [chats, setChats] = useState([]);
-  const [activePings, setActivePings] = useState({});
-
-  useEffect(() => {
-    let pid = sessionStorage.getItem('sequence_playerId');
-    if (!pid) {
-      pid = 'player_' + Math.random().toString(36).substr(2, 9);
-      sessionStorage.setItem('sequence_playerId', pid);
+  & > div {
+    flex: 1 1 0;
+    padding: 32px;
+    @media (max-width: 1024px) {
+      padding: 24px 20px;
     }
-    playerIdRef.current = pid;
+  }
 
-    const handleRoomJoined = (roomId) => {
-      setCurrentRoom(roomId);
-      setAppState('team_select');
-    };
+  .icon {
+    margin-bottom: 16px;
+    width: 22px;
+    height: 22px;
+  }
 
-    const handleRoomInfo = (info) => {
-      if (info) setRoomInfo(info);
-    };
+  @media (max-width: 1024px) {
+    flex-direction: column;
+    text-align: center;
+  }
+}
 
-    const handleAssignedTeam = (color) => {
-      setMyTeam(color);
-      setAppState('game');
-    };
+#docs {
+  border-right: 1px solid var(--border);
 
-    const handleGameState = (gameState) => {
-      if (!gameState) return;
+  @media (max-width: 1024px) {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+}
 
-      setBoardChips(gameState.board || Array(100).fill(null));
-      setCurrentTurn(gameState.turn || 'red');
-      setActivePlayerId(gameState.activePlayerId);
-      setActivePlayerName(gameState.activePlayerName || 'Waiting...');
-      setLogs(gameState.logs || []);
-      setIsGameStarted(gameState.isGameStarted || false);
-      setWinner(gameState.winner);
-      setWinningLine(gameState.winningLine || []);
-      setHostId(gameState.hostId);
-      setTurnDeadline(gameState.turnDeadline || 0);
-      setLastMoveIndex(gameState.lastMoveIndex);
+#next-steps ul {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  gap: 8px;
+  margin: 32px 0 0;
 
-      if (gameState.winner && !winner) {
-        playSound('win');
-        setTimeout(() => {
-          confetti({ particleCount: 250, spread: 150, origin: { y: 0.6 }, colors: [gameState.winner === 'red' ? '#ef4444' : gameState.winner === 'blue' ? '#3b82f6' : '#22c55e', '#ffffff'] });
-        }, 200);
-        setTimeout(() => {
-          confetti({ particleCount: 150, spread: 100, origin: { y: 0.4 }, colors: ['#ffffff', '#f97316', '#ec4899'] });
-        }, 600);
-      }
-    };
+  .logo {
+    height: 18px;
+  }
 
-    const handleReceivePing = ({ index, teamColor }) => {
-      if (teamColor === myTeam) {
-        setActivePings(prev => ({ ...prev, [index]: true }));
-        setTimeout(() => setActivePings(prev => { const n = { ...prev }; delete n[index]; return n; }), 3000);
-        if ('vibrate' in navigator) navigator.vibrate(10);
-      }
-    };
+  a {
+    color: var(--text-h);
+    font-size: 16px;
+    border-radius: 6px;
+    background: var(--social-bg);
+    display: flex;
+    padding: 6px 12px;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    transition: box-shadow 0.3s;
 
-    const handleYourHand = (dealtHand) => setHand(dealtHand || []);
-    const handleChatMessage = (msg) => {
-      setChats(prev => [...prev, msg]);
-      playSound('chat');
-      setTimeout(() => {
-        const chatContainer = document.querySelector('.chat-scroll-container');
-        if (chatContainer) chatContainer.scrollTop = chatContainer.scrollHeight;
-      }, 100);
-    };
+    &:hover {
+      box-shadow: var(--shadow);
+    }
+    .button-icon {
+      height: 18px;
+      width: 18px;
+    }
+  }
 
-    const handleGameRestarted = (allHands) => {
-      setWinner(null);
-      setWinningLine([]);
-      setActivePings({});
-      setLastMoveIndex(null);
-      if (allHands && allHands[playerIdRef.current]) {
-        setHand(allHands[playerIdRef.current]);
-        setSelectedCard(null);
-      }
-      setChats([]);
-    };
+  @media (max-width: 1024px) {
+    margin-top: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
 
-    const handleErrorMessage = (msg) => {
-      alert(msg);
-    };
-
-    socket.on('room_joined', handleRoomJoined);
-    socket.on('room_info', handleRoomInfo);
-    socket.on('assigned_team', handleAssignedTeam);
-    socket.on('game_state', handleGameState);
-    socket.on('receive_ping', handleReceivePing);
-    socket.on('your_hand', handleYourHand);
-    socket.on('chat_message', handleChatMessage);
-    socket.on('game_restarted', handleGameRestarted);
-    socket.on('error_message', handleErrorMessage);
-
-    const savedRoom = sessionStorage.getItem('sequence_room');
-    const savedName = sessionStorage.getItem('sequence_name');
-    if (savedRoom && savedName) {
-      setRoomInput(savedRoom);
-      setPlayerName(savedName);
-      socket.emit('join_room', { roomId: savedRoom, playerName: savedName, playerId: pid, avatar });
+    li {
+      flex: 1 1 calc(50% - 8px);
     }
 
-    return () => socket.offAny();
-  }, [winner]);
-
-  useEffect(() => {
-    if (!turnDeadline || winner || !isGameStarted) {
-      setTimeLeft(60);
-      return;
+    a {
+      width: 100%;
+      justify-content: center;
+      box-sizing: border-box;
     }
-    const interval = setInterval(() => {
-      const remaining = Math.max(0, Math.floor((turnDeadline - Date.now()) / 1000));
-      setTimeLeft(remaining);
-      if (remaining === 0 && socket.id === activePlayerId) {
-        socket.emit('timeout_skip', { roomId: currentRoom, playerId: playerIdRef.current });
-      }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [turnDeadline, winner, isGameStarted, activePlayerId, currentRoom]);
+  }
+}
 
-  const handleJoinRoom = (e) => {
-    e.preventDefault();
-    if (roomInput.trim() && playerName.trim()) {
-      sessionStorage.setItem('sequence_room', roomInput.trim());
-      sessionStorage.setItem('sequence_name', playerName.trim());
-      socket.emit('join_room', { roomId: roomInput.trim(), playerName: playerName.trim(), playerId: playerIdRef.current, avatar });
-    }
-  };
+#spacer {
+  height: 88px;
+  border-top: 1px solid var(--border);
+  @media (max-width: 1024px) {
+    height: 48px;
+  }
+}
 
-  const handleSendChat = (e) => {
-    e.preventDefault();
-    if (chatInput.trim()) {
-      socket.emit('send_chat', { roomId: currentRoom, playerId: playerIdRef.current, msg: chatInput });
-      setChatInput('');
-    }
-  };
+.ticks {
+  position: relative;
+  width: 100%;
 
-  const handlePing = (e, index) => {
-    e.preventDefault();
-    if (!isGameStarted || winner) return;
-    socket.emit('ping_cell', { roomId: currentRoom, index, teamColor: myTeam });
-    if ('vibrate' in navigator) navigator.vibrate(10);
-  };
+  &::before,
+  &::after {
+    content: '';
+    position: absolute;
+    top: -4.5px;
+    border: 5px solid transparent;
+  }
 
-  const checkDeadCard = (card) => {
-    if (!card || card.includes('J')) return false;
-    const indices = BOARD_LAYOUT.map((c, i) => c === card ? i : -1).filter(i => i !== -1);
-    return indices.every(i => boardChips[i] !== null);
-  };
-
-  const handleCellClick = (index) => {
-    if (!isGameStarted || winner || playerIdRef.current !== activePlayerId || !selectedCard || BOARD_LAYOUT[index] === 'FREE') return;
-
-    const targetSpace = BOARD_LAYOUT[index];
-    const isTwoEyed = selectedCard === 'J♦' || selectedCard === 'J♣';
-    const isOneEyed = selectedCard === 'J♠' || selectedCard === 'J♥';
-
-    if (isTwoEyed && boardChips[index] !== null) return;
-    if (isOneEyed && (boardChips[index] === null || boardChips[index] === myTeam)) return;
-    if (!isTwoEyed && !isOneEyed && (boardChips[index] !== null || selectedCard !== targetSpace)) return;
-
-    playSound(isOneEyed ? 'remove' : 'play');
-    if ('vibrate' in navigator && !selectedCard.includes('J')) navigator.vibrate(15);
-
-    socket.emit('place_chip', { roomId: currentRoom, index, teamColor: myTeam, playedCard: selectedCard, playerId: playerIdRef.current });
-
-    setHand(hand.filter(card => card !== selectedCard));
-    setSelectedCard(null);
-  };
-
-  // --- NEW: Disconnects the socket and drops the player back to Lobby ---
-  const handleDisconnect = () => {
-    sessionStorage.clear();
-    window.location.reload();
-  };
-
-  const t = { bg: "bg-gradient-to-br from-[#0f5c6e] via-[#1a7f92] to-[#1292a8]" };
-
-  const getTeamNeon = (team) =>
-    team === 'red' ? 'text-red-400' : team === 'blue' ? 'text-blue-400' : team === 'green' ? 'text-green-400' : 'text-gray-300';
-
-  const getChipStyle = (color, isWin, isLast) => {
-    let bg = color === 'red' ? 'bg-[#cc2929] border border-[#7a1818]' 
-           : color === 'blue' ? 'bg-[#2563eb] border border-[#173d8f]' 
-           : 'bg-[#16a34a] border border-[#0f6b30]';
-           
-    let highlight = isLast && !isWin ? 'ring-[3px] ring-yellow-400 shadow-[0_0_20px_rgba(250,204,21,0.8)] z-30 chip-drop' : '';
-    let winGlow = isWin ? 'ring-4 ring-white animate-pulse shadow-[0_0_20px_rgba(255,255,255,1)] z-30' : '';
-    
-    return `${bg} shadow-[2px_3px_5px_rgba(0,0,0,0.4)] ${highlight} ${winGlow}`;
-  };
-
-  if (appState === 'lobby' || appState === 'team_select') return (
-    <div className={`min-h-[100dvh] w-full ${t.bg} text-white flex flex-col items-center justify-center p-2 sm:p-6 overflow-hidden font-sans`}>
-       <div className="mb-4">
-         <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-300 tracking-[0.2em]">SEQUENCE</h2>
-       </div>
-
-       <div className="bg-black/30 backdrop-blur-md p-8 rounded-3xl border border-white/10 shadow-2xl w-full max-w-2xl text-center z-10 flex flex-col items-center">
-          <h1 className="text-5xl font-bold text-white mb-8 tracking-[0.2em]">SEQUENCE</h1>
-
-          {appState === 'lobby' ? (
-            <form onSubmit={handleJoinRoom} className="flex flex-col gap-4 w-full max-w-md mx-auto">
-              <div className="flex justify-center gap-2 mb-4">
-                {AVATARS.map(a => (
-                  <div key={a} onClick={()=>setAvatar(a)} className={`text-2xl cursor-pointer p-2 rounded-xl transition-all ${avatar===a?'bg-white/20 scale-125':'hover:scale-110'}`}>{a}</div>
-                ))}
-              </div>
-              <input type="text" placeholder="Name" value={playerName} onChange={e=>setPlayerName(e.target.value)} className="w-full p-4 bg-black/50 border border-white/10 rounded-xl text-center font-bold text-white" required />
-              <input type="text" placeholder="Room Code" value={roomInput} onChange={e=>setRoomInput(e.target.value)} className="w-full p-4 bg-black/50 border border-white/10 rounded-xl text-center font-bold uppercase text-white" required />
-              <button className="bg-white text-black font-black py-4 rounded-xl mt-4 hover:scale-105 transition-transform active:scale-95">JOIN SQUAD</button>
-            </form>
-          ) : (
-            <div className="w-full flex flex-col items-center">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
-                {['red','blue','green'].map(color => (
-                  <div key={color} className="flex flex-col gap-2 border border-white/10 p-4 rounded-2xl bg-black/40">
-                    <h3 className={`font-black text-xl uppercase ${getTeamNeon(color)}`}>{color}</h3>
-                    <div className="text-sm font-bold opacity-70 mb-4 h-16">{roomInfo[color]?.join(', ') || 'Empty'}</div>
-                    <button onClick={() => socket.emit('join_team', {roomId: currentRoom, teamColor: color, playerId: playerIdRef.current})} disabled={roomInfo[color]?.length >= 4} className="bg-white/20 py-2 rounded-lg font-bold hover:bg-white/30 transition-colors text-white transform active:scale-95">
-                      JOIN TEAM
-                    </button>
-                  </div>
-                ))}
-              </div>
-              
-              {/* --- QUIT BUTTON: TEAM SELECT SCREEN --- */}
-              <button onClick={handleDisconnect} className="mt-8 bg-transparent border border-white/20 text-white/70 hover:text-white hover:bg-white/10 px-6 py-2 rounded-lg font-bold text-xs tracking-widest transition-all">
-                🚪 LEAVE ROOM
-              </button>
-            </div>
-          )}
-       </div>
-    </div>
-  );
-
-  const isMyTurn = playerIdRef.current === activePlayerId && isGameStarted && !winner;
-  const isDeadCard = selectedCard && checkDeadCard(selectedCard);
-  const strokeColor = winner === 'red' ? '#ef4444' : winner === 'blue' ? '#3b82f6' : '#22c55e';
-
-  return (
-    <div className={`min-h-[100dvh] md:h-[100dvh] overflow-y-auto md:overflow-hidden ${t.bg} text-white flex flex-col md:flex-row p-2 sm:p-4 gap-4 font-sans relative`}>
-      <style>{chipAnimationStyles}</style>
-
-      {/* WAITING TO START OVERLAY */}
-      {!isGameStarted && !winner && (
-        <div className="absolute inset-0 z-40 bg-black/80 backdrop-blur-md flex flex-col items-center justify-start py-12 md:justify-center animate-in fade-in duration-500 overflow-y-auto px-4">
-          <h2 className={`text-3xl sm:text-5xl md:text-6xl font-black mb-2 tracking-widest text-center ${getTeamNeon(myTeam)} shrink-0`}>
-            {myTeam.toUpperCase()} SQUAD DEPLOYED
-          </h2>
-
-          <p className="text-slate-300 mb-8 font-bold tracking-widest text-center shrink-0">
-            {playerIdRef.current === hostId ? "You are the Room Host." : "Waiting for Host to start the match..."}<br/>
-            Players in Room: {roomInfo.total} / 12
-          </p>
-
-          <div className="flex flex-col md:flex-row gap-4 mb-8 w-full max-w-5xl shrink-0">
-            {['red', 'blue', 'green'].map(color => (
-              <div key={color} className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col items-center">
-                <h3 className={`font-black uppercase text-xl mb-3 ${getTeamNeon(color)}`}>{color} Team</h3>
-                <div className="flex-1 w-full flex flex-col gap-2 mb-4">
-                  {roomInfo[color]?.length > 0 ? (
-                    roomInfo[color].map((player, idx) => (
-                      <div key={idx} className="bg-black/40 px-3 py-2 rounded-lg text-sm text-white font-bold w-full text-center truncate shadow-inner">
-                        {player}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-gray-500 text-sm font-bold text-center italic py-2">Empty</div>
-                  )}
-                </div>
-                
-                {playerIdRef.current === hostId && (
-                  <div className="w-full flex gap-2">
-                    <button onClick={() => socket.emit('add_bot', {roomId: currentRoom, teamColor: color})} disabled={roomInfo[color]?.length >= 4} className="flex-1 bg-white/10 border border-white/20 py-2 rounded-lg font-bold text-xs hover:bg-white/20 transition-colors uppercase text-white active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
-                      + Add Bot
-                    </button>
-                    {roomInfo[color]?.some(p => p.includes('🤖 Bot')) && (
-                      <button onClick={() => socket.emit('remove_bot', {roomId: currentRoom, teamColor: color})} className="flex-1 bg-rose-500/20 border border-rose-500/40 py-2 rounded-lg font-bold text-xs hover:bg-rose-500/40 transition-colors uppercase text-rose-200 active:scale-95">
-                        - Remove
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {playerIdRef.current === hostId && (
-            <button onClick={() => socket.emit('start_game', currentRoom)} className="shrink-0 bg-white text-black font-black py-4 px-12 rounded-2xl shadow-[0_0_30px_rgba(255,255,255,0.4)] hover:scale-110 transition-transform text-xl sm:text-2xl active:scale-105 tracking-widest">
-              START MATCH
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* GAME OVER MODAL */}
-      {winner && (
-        <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[100] bg-black/80 backdrop-blur-md border border-white/20 p-6 sm:p-10 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.8)] flex flex-col items-center justify-center animate-in fade-in zoom-in duration-500 w-[90vw] max-w-lg pointer-events-auto">
-          <h1 className={`text-5xl sm:text-7xl font-black mb-8 tracking-[0.2em] text-center ${getTeamNeon(winner)}`}>{winner.toUpperCase()} WINS</h1>
-          <div className="flex gap-4 w-full">
-            <button onClick={() => socket.emit('restart_game', currentRoom)} className="flex-1 bg-white text-black font-black py-4 px-4 rounded-xl hover:scale-105 transition-all shadow-[0_0_20px_rgba(255,255,255,0.3)] text-sm sm:text-base">PLAY AGAIN</button>
-            <button onClick={handleDisconnect} className="flex-1 bg-transparent border border-white/20 text-white font-bold py-4 px-4 rounded-xl hover:bg-white/10 transition-all text-sm sm:text-base">LEAVE ROOM</button>
-          </div>
-        </div>
-      )}
-
-      {/* LEFT COLUMN: Game Board & Hand */}
-      <div className="flex-1 flex flex-col items-center justify-start w-full relative z-10 md:h-full md:overflow-y-auto md:pr-4 pb-12 shrink-0 scroll-smooth">
-        
-        {/* --- TITLE BAR WITH NEW QUIT BUTTON --- */}
-        <div className="w-full flex justify-between items-center bg-black/40 border border-white/10 p-2 sm:p-3 rounded-xl sm:rounded-2xl mt-2 mb-4 shadow-sm backdrop-blur-md shrink-0">
-           <div className={`font-black tracking-widest text-xs sm:text-base ${isGameStarted ? getTeamNeon(currentTurn) : 'text-slate-500'}`}>
-             {winner ? 'MATCH COMPLETE' : isGameStarted ? `${activePlayerName}'S TURN` : 'STANDBY...'}
-           </div>
-           
-           <div className="flex items-center gap-3 sm:gap-4">
-             <div className="font-bold text-xs sm:text-base opacity-70 tracking-widest hidden md:block">SEQUENCE CLASSIC</div>
-             <button onClick={handleDisconnect} className="bg-rose-500/20 border border-rose-500/40 text-rose-200 px-3 py-1.5 sm:px-4 rounded-lg text-[10px] sm:text-xs font-bold hover:bg-rose-500/40 transition-colors active:scale-95 tracking-widest flex items-center gap-1 sm:gap-2">
-               <span className="text-sm sm:text-base leading-none">🚪</span> QUIT
-             </button>
-           </div>
-        </div>
-
-        <div className="w-full max-w-[95vw] md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto rounded-xl sm:rounded-[1rem] border border-white/20 shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden shrink-0 bg-white/5 p-1 sm:p-2 relative">
-          
-          <div className="grid grid-cols-10 gap-[2px] sm:gap-[3px] w-full bg-transparent relative z-10">
-            {BOARD_LAYOUT.map((card, idx) => {
-              const chip = boardChips[idx];
-              const isWinChip = winningLine.includes(idx);
-              const isPung = activePings[idx];
-              const isLastMove = lastMoveIndex === idx; 
-              const isMatch = isMyTurn && selectedCard && ((card === selectedCard && !chip) || (selectedCard.includes('J') && ((selectedCard.includes('♦')||selectedCard.includes('♣'))?!chip:chip&&chip!==myTeam)));
-
-              return (
-                <div key={idx} onClick={() => handleCellClick(idx)} onContextMenu={(e) => handlePing(e, idx)}
-                     className={`relative aspect-[3/4] flex items-center justify-center ${isMatch?'ring-2 sm:ring-4 ring-cyan-400 z-20 scale-110 cursor-pointer shadow-[0_0_15px_rgba(34,211,238,0.8)] rounded-[3px] sm:rounded-md':''} ${winner && !isWinChip ? 'opacity-30' : ''} ${isPung ? 'ring-2 ring-rose-500 animate-pulse rounded-[3px] sm:rounded-md' : ''}`}>
-
-                  {isPung && <div className="absolute inset-0 bg-rose-500/40 rounded animate-ping pointer-events-none z-20"></div>}
-
-                  <CardVisual card={card} />
-
-                  {chip && (
-                    <div 
-                      key={`chip-${idx}-${chip}`}
-                      className={`absolute w-[80%] sm:w-[75%] aspect-square rounded-full z-10 flex items-center justify-center ${getChipStyle(chip, isWinChip, isLastMove)} pointer-events-none`} 
-                    />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {winner && winningLine.length === 5 && (
-            <svg className="absolute inset-0 w-full h-full pointer-events-none z-40 drop-shadow-2xl">
-              <line
-                pathLength="100"
-                x1={`${(winningLine[0] % 10) * 10 + 5}%`}
-                y1={`${Math.floor(winningLine[0] / 10) * 10 + 5}%`}
-                x2={`${(winningLine[4] % 10) * 10 + 5}%`}
-                y2={`${Math.floor(winningLine[4] / 10) * 10 + 5}%`}
-                stroke={strokeColor}
-                strokeWidth="10"
-                strokeLinecap="round"
-                className="winning-line"
-                style={{ filter: `drop-shadow(0 0 8px ${strokeColor})` }}
-              />
-            </svg>
-          )}
-
-        </div>
-
-        <div className="w-full mt-4 sm:mt-8 flex flex-col items-center shrink-0">
-          <p className="text-[10px] sm:text-xs font-bold opacity-70 mb-2 sm:mb-4 tracking-widest text-center">RIGHT CLICK BOARD TO PING TEAMMATES</p>
-          {!winner && (
-            <>
-              <div className="flex -space-x-3 sm:-space-x-4">
-                {(hand || []).map((card, i) => (
-                  <div key={i} onClick={() => isMyTurn && setSelectedCard(card)} 
-                       className={`relative w-12 h-16 sm:w-16 sm:h-24 md:w-20 md:h-28 flex items-center justify-center origin-bottom transition-all rounded-[3px] sm:rounded-md ${selectedCard===card?'ring-2 sm:ring-4 ring-cyan-400 -translate-y-4 sm:-translate-y-6 scale-110 z-20 shadow-[0_0_20px_rgba(34,211,238,0.5)]':'z-0 shadow-lg'} ${isMyTurn?'cursor-pointer hover:-translate-y-2 sm:hover:-translate-y-4':'opacity-50'}`}>
-                    <CardVisual card={card} />
-                  </div>
-                ))}
-              </div>
-              {isMyTurn && isDeadCard && (
-                <button onClick={() => {socket.emit('trade_dead_card', {roomId: currentRoom, playerId: playerIdRef.current, deadCard: selectedCard}); setSelectedCard(null)}} className="mt-6 bg-rose-600 px-6 py-2 rounded-full font-bold animate-bounce shadow-lg shadow-rose-500/50 text-white border border-rose-400">TRADE DEAD CARD</button>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* RIGHT COLUMN: Social Panel */}
-      <div className="w-full md:w-80 lg:w-96 flex flex-col gap-4 min-h-[300px] md:h-full relative z-10 shrink-0">
-        <div className="bg-black/40 border border-white/10 rounded-2xl flex-1 flex flex-col overflow-hidden shadow-lg">
-          <div className="p-3 border-b border-white/10 font-bold tracking-widest text-xs opacity-70 text-white">COMMUNICATIONS</div>
-          <div className="chat-scroll-container flex-1 p-3 overflow-y-auto flex flex-col gap-2 text-sm">
-            {chats.map((c, i) => (
-              <div key={i} className={`p-2 rounded-lg max-w-[90%] text-white ${c.name === playerName ? 'bg-white/20 self-end' : 'bg-black/40 self-start border-l-2'} ${c.team==='red'?'border-rose-500':c.team==='blue'?'border-cyan-500':'border-emerald-500'}`}>
-                <span className="font-bold text-xs opacity-50 block mb-1">{c.name}</span>
-                {c.msg}
-              </div>
-            ))}
-          </div>
-          <form onSubmit={handleSendChat} className="p-2 border-t border-white/10 flex gap-2 bg-black/60">
-            <input type="text" value={chatInput} onChange={e=>setChatInput(e.target.value)} placeholder="Send message..." className="flex-1 bg-transparent focus:outline-none text-sm px-2 text-white"/>
-            <button type="submit" className="bg-white/20 text-white px-3 py-1 rounded-md text-xs font-bold active:scale-95">SEND</button>
-          </form>
-        </div>
-
-        <div className="h-48 bg-black/40 border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-lg">
-          <div className="p-3 border-b border-white/10 font-bold tracking-widest text-xs opacity-70 text-white">ACTION LOG</div>
-          <div className="flex-1 p-3 overflow-y-auto flex flex-col gap-1 text-xs opacity-80 text-white">
-            {logs.map((log, i) => <div key={i} className="border-b border-white/5 pb-1">⚡ {log}</div>)}
-          </div>
-        </div>
-      </div>
-
-    </div>
-  );
+  &::before {
+    left: 0;
+    border-left-color: var(--border);
+  }
+  &::after {
+    right: 0;
+    border-right-color: var(--border);
+  }
 }
