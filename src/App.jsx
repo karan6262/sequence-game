@@ -487,13 +487,34 @@ export default function SequenceGame() {
         </div>
       )}
 
-      {/* --- FIXED SCROLLING LEFT COLUMN --- */}
-      <div className="flex-1 flex flex-col items-center justify-center w-full relative z-10 h-full overflow-y-auto md:pr-4 pb-4 shrink-0">
+      {/* --- NEW PURE BOARD & HAND LAYOUT --- */}
+      <div className="flex-1 flex flex-col md:flex-row items-center justify-center w-full relative z-10 h-full overflow-y-auto md:overflow-hidden md:pr-4 pb-4 shrink-0 gap-4 md:gap-6 lg:gap-10">
         
-        {/* DYNAMIC SIZING WITHOUT CLIPPING */}
+        {/* DESKTOP ONLY: Vertical Hand on the Left */}
+        {!winner && (
+          <div className="hidden md:flex flex-col items-center shrink-0 w-24 lg:w-32 z-20">
+             <div className="flex flex-col -space-y-10 lg:-space-y-12">
+               {(hand || []).map((card, i) => (
+                 <div key={`hand-desktop-${i}-${card}`} onClick={() => isMyTurn && setSelectedCard(card)} 
+                      className={`relative md:w-16 md:h-24 lg:w-20 lg:h-28 flex items-center justify-center origin-left transition-all duration-300 rounded-[3px] sm:rounded-md card-draw shadow-lg ${selectedCard===card?'ring-4 ring-cyan-400 translate-x-6 scale-110 z-20 shadow-[0_0_30px_rgba(34,211,238,0.6)]':'z-0'} ${isMyTurn?'cursor-pointer hover:translate-x-4':'opacity-50'}`}>
+                   <CardVisual card={card} />
+                 </div>
+               ))}
+             </div>
+             
+             <div className="h-12 flex items-center justify-center mt-6 w-full">
+               {isMyTurn && isDeadCard && (
+                 <button onClick={() => {socket.emit('trade_dead_card', {roomId: currentRoom, playerId: playerIdRef.current, deadCard: selectedCard}); setSelectedCard(null)}} className="bg-rose-600 px-4 py-2 rounded-full font-bold text-xs animate-bounce shadow-lg shadow-rose-500/50 text-white border border-rose-400">TRADE DEAD</button>
+               )}
+             </div>
+          </div>
+        )}
+
+        {/* MASSIVE RESPONSIVE BOARD */}
+        {/* Math: 98vw on mobile. On PC, it scales precisely to screen height without scrolling. */}
         <div 
            className="w-full mx-auto rounded-xl sm:rounded-[1rem] border border-white/20 shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden shrink-0 bg-white/5 p-[2px] sm:p-1 md:p-2 relative transition-all duration-500"
-           style={{ maxWidth: 'min(100%, calc((100vh - 160px) * 0.75))' }}
+           style={{ maxWidth: 'min(98vw, calc((100vh - 40px) * 0.75))' }}
         >
           
           <div className="grid grid-cols-10 gap-[1px] sm:gap-[2px] w-full bg-transparent relative z-10">
@@ -548,22 +569,27 @@ export default function SequenceGame() {
               />
             </svg>
           )}
+
+          <p className="hidden md:block absolute bottom-1 right-2 text-white/40 text-[9px] tracking-widest pointer-events-none z-0">
+             RIGHT CLICK BOARD TO PING TEAMMATES
+          </p>
         </div>
 
-        <div className="w-full shrink-0 flex flex-col items-center mt-3 sm:mt-4">
-          <p className="text-[10px] sm:text-xs font-bold opacity-70 mb-2 sm:mb-3 tracking-widest text-center">RIGHT CLICK BOARD TO PING TEAMMATES</p>
+        {/* MOBILE ONLY: Horizontal Hand on the Bottom */}
+        <div className="md:hidden w-full shrink-0 flex flex-col items-center mt-3">
+          <p className="text-[10px] font-bold opacity-70 mb-2 tracking-widest text-center">RIGHT CLICK BOARD TO PING</p>
           {!winner && (
             <>
-              <div className="flex -space-x-3 sm:-space-x-4">
+              <div className="flex -space-x-3">
                 {(hand || []).map((card, i) => (
-                  <div key={`hand-${i}-${card}`} onClick={() => isMyTurn && setSelectedCard(card)} 
-                       className={`relative w-10 h-14 sm:w-12 sm:h-16 md:w-14 md:h-20 flex items-center justify-center origin-bottom transition-all duration-300 rounded-[3px] sm:rounded-md card-draw ${selectedCard===card?'ring-2 sm:ring-4 ring-cyan-400 -translate-y-4 sm:-translate-y-6 scale-110 z-20 shadow-[0_0_30px_rgba(34,211,238,0.6)]':'z-0 shadow-lg'} ${isMyTurn?'cursor-pointer hover:-translate-y-2 sm:hover:-translate-y-4':'opacity-50'}`}>
+                  <div key={`hand-mobile-${i}-${card}`} onClick={() => isMyTurn && setSelectedCard(card)} 
+                       className={`relative w-12 h-16 sm:w-16 sm:h-24 flex items-center justify-center origin-bottom transition-all duration-300 rounded-[3px] sm:rounded-md card-draw ${selectedCard===card?'ring-2 sm:ring-4 ring-cyan-400 -translate-y-4 sm:-translate-y-6 scale-110 z-20 shadow-[0_0_30px_rgba(34,211,238,0.6)]':'z-0 shadow-lg'} ${isMyTurn?'cursor-pointer hover:-translate-y-2':'opacity-50'}`}>
                     <CardVisual card={card} />
                   </div>
                 ))}
               </div>
               
-              <div className="h-10 sm:h-12 flex items-center justify-center mt-2 w-full">
+              <div className="h-10 flex items-center justify-center mt-2 w-full">
                 {isMyTurn && isDeadCard && (
                   <button onClick={() => {socket.emit('trade_dead_card', {roomId: currentRoom, playerId: playerIdRef.current, deadCard: selectedCard}); setSelectedCard(null)}} className="bg-rose-600 px-6 py-2 rounded-full font-bold text-[10px] sm:text-xs animate-bounce shadow-lg shadow-rose-500/50 text-white border border-rose-400">TRADE DEAD CARD</button>
                 )}
@@ -575,6 +601,7 @@ export default function SequenceGame() {
 
       <div className="w-full md:w-80 lg:w-96 flex flex-col gap-3 min-h-[300px] md:h-full relative z-10 shrink-0">
         
+        {/* DASHBOARD TOP MENU */}
         <div className="bg-black/40 border border-white/10 rounded-2xl flex flex-col p-3 shadow-lg shrink-0">
            <div className="w-full flex justify-between items-center mb-2">
              <div className={`font-black tracking-widest text-xs sm:text-sm ${isGameStarted ? getTeamNeon(currentTurn) : 'text-slate-500'}`}>
