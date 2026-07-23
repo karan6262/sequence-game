@@ -95,8 +95,6 @@ export default function SequenceGame() {
   const [chatInput, setChatInput] = useState('');
   const [chats, setChats] = useState([]);
   const [activePings, setActivePings] = useState({});
-  
-  // NEW: Toggle for Quick Rules Modal
   const [showRules, setShowRules] = useState(false);
 
   useEffect(() => {
@@ -106,6 +104,15 @@ export default function SequenceGame() {
       sessionStorage.setItem('sequence_playerId', pid);
     }
     playerIdRef.current = pid;
+
+    // NEW: Auto-recover connection if socket mysteriously drops
+    const handleConnect = () => {
+      const savedRoom = sessionStorage.getItem('sequence_room');
+      const savedName = sessionStorage.getItem('sequence_name');
+      if (savedRoom && savedName) {
+        socket.emit('join_room', { roomId: savedRoom, playerName: savedName, playerId: playerIdRef.current, avatar });
+      }
+    };
 
     const handleRoomJoined = (roomId) => {
       setCurrentRoom(roomId);
@@ -181,6 +188,7 @@ export default function SequenceGame() {
       alert(msg);
     };
 
+    socket.on('connect', handleConnect);
     socket.on('room_joined', handleRoomJoined);
     socket.on('room_info', handleRoomInfo);
     socket.on('assigned_team', handleAssignedTeam);
@@ -191,17 +199,13 @@ export default function SequenceGame() {
     socket.on('game_restarted', handleGameRestarted);
     socket.on('error_message', handleErrorMessage);
 
-    const savedRoom = sessionStorage.getItem('sequence_room');
-    const savedName = sessionStorage.getItem('sequence_name');
-    if (savedRoom && savedName) {
-      setRoomInput(savedRoom);
-      setPlayerName(savedName);
-      socket.emit('join_room', { roomId: savedRoom, playerName: savedName, playerId: pid, avatar });
-    }
+    // Initial load connection attempt
+    handleConnect();
 
     return () => socket.offAny();
   }, [winner]);
 
+  // NEW: Emit timeout unconditionally. Server safely validates deadline.
   useEffect(() => {
     if (!turnDeadline || winner || !isGameStarted) {
       setTimeLeft(60);
@@ -210,14 +214,13 @@ export default function SequenceGame() {
     const interval = setInterval(() => {
       const remaining = Math.max(0, Math.floor((turnDeadline - Date.now()) / 1000));
       setTimeLeft(remaining);
-      if (remaining === 0 && socket.id === activePlayerId) {
-        socket.emit('timeout_skip', { roomId: currentRoom, playerId: playerIdRef.current });
+      if (remaining === 0) {
+        socket.emit('timeout_skip', { roomId: currentRoom });
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [turnDeadline, winner, isGameStarted, activePlayerId, currentRoom]);
+  }, [turnDeadline, winner, isGameStarted, currentRoom]);
 
-  // --- NEW: Browser Tab Alerts when it's your turn ---
   useEffect(() => {
     let titleInterval;
     const isMyTurn = playerIdRef.current === activePlayerId && isGameStarted && !winner;
@@ -358,7 +361,6 @@ export default function SequenceGame() {
     <div className={`min-h-[100dvh] md:h-[100dvh] overflow-y-auto md:overflow-hidden ${t.bg} text-white flex flex-col md:flex-row p-2 sm:p-4 gap-4 font-sans relative`}>
       <style>{chipAnimationStyles}</style>
 
-      {/* --- NEW QUICK RULES MODAL --- */}
       {showRules && (
         <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
            <div className="bg-gradient-to-br from-slate-900 to-black border border-white/20 p-6 sm:p-8 rounded-2xl shadow-2xl max-w-md w-full relative pointer-events-auto">
@@ -376,7 +378,6 @@ export default function SequenceGame() {
         </div>
       )}
 
-      {/* WAITING TO START OVERLAY */}
       {!isGameStarted && !winner && (
         <div className="absolute inset-0 z-40 bg-black/80 backdrop-blur-md flex flex-col items-center justify-start py-12 md:justify-center animate-in fade-in duration-500 overflow-y-auto px-4">
           <h2 className={`text-3xl sm:text-5xl md:text-6xl font-black mb-2 tracking-widest text-center ${getTeamNeon(myTeam)} shrink-0`}>
@@ -428,7 +429,6 @@ export default function SequenceGame() {
         </div>
       )}
 
-      {/* GAME OVER MODAL */}
       {winner && (
         <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[100] bg-black/80 backdrop-blur-md border border-white/20 p-6 sm:p-10 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.8)] flex flex-col items-center justify-center animate-in fade-in zoom-in duration-500 w-[90vw] max-w-lg pointer-events-auto">
           <h1 className={`text-5xl sm:text-7xl font-black mb-8 tracking-[0.2em] text-center ${getTeamNeon(winner)}`}>{winner.toUpperCase()} WINS</h1>
@@ -439,10 +439,8 @@ export default function SequenceGame() {
         </div>
       )}
 
-      {/* LEFT COLUMN: Game Board & Hand */}
       <div className="flex-1 flex flex-col items-center justify-start w-full relative z-10 md:h-full md:overflow-y-auto md:pr-4 pb-12 shrink-0 scroll-smooth">
         
-        {/* TITLE BAR & TURN TIMER */}
         <div className="w-full flex flex-col bg-black/40 border border-white/10 p-2 sm:p-3 rounded-xl sm:rounded-2xl mt-2 mb-4 shadow-sm backdrop-blur-md shrink-0 relative overflow-hidden">
            <div className="w-full flex justify-between items-center z-10">
              <div className={`font-black tracking-widest text-xs sm:text-base ${isGameStarted ? getTeamNeon(currentTurn) : 'text-slate-500'}`}>
@@ -459,7 +457,6 @@ export default function SequenceGame() {
              </div>
            </div>
            
-           {/* --- NEW VISUAL TURN TIMER --- */}
            {isGameStarted && !winner && (
              <div className="w-full h-1 sm:h-1.5 bg-black/50 rounded-full overflow-hidden mt-2 z-10">
                <div 
@@ -538,10 +535,8 @@ export default function SequenceGame() {
         </div>
       </div>
 
-      {/* RIGHT COLUMN: Social Panel & Live Roster */}
       <div className="w-full md:w-80 lg:w-96 flex flex-col gap-4 min-h-[300px] md:h-full relative z-10 shrink-0">
         
-        {/* --- NEW LIVE ROSTER --- */}
         <div className="bg-black/40 border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-lg shrink-0">
           <div className="p-2 sm:p-3 border-b border-white/10 font-bold tracking-widest text-[10px] sm:text-xs opacity-70 text-white">LIVE ROSTER</div>
           <div className="p-2 sm:p-3 grid grid-cols-3 gap-2">
