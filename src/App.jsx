@@ -317,7 +317,8 @@ export default function SequenceGame() {
   };
 
   const handleCellClick = (index) => {
-    if (!isGameStarted || winner || playerIdRef.current !== activePlayerId || !selectedCard || BOARD_LAYOUT[index] === 'FREE') return;
+    // STRICT FIX: Prevent the user from playing if the visual timer hits 0
+    if (!isGameStarted || winner || playerIdRef.current !== activePlayerId || !selectedCard || BOARD_LAYOUT[index] === 'FREE' || timeLeft === 0) return;
 
     const targetSpace = BOARD_LAYOUT[index];
     const isTwoEyed = selectedCard === 'J♦' || selectedCard === 'J♣';
@@ -487,7 +488,6 @@ export default function SequenceGame() {
         </div>
       )}
 
-      {/* --- MOBILE STATUS BAR (Visible only on mobile) --- */}
       <div className="md:hidden bg-black/40 border border-white/10 rounded-2xl flex flex-col p-3 shadow-lg shrink-0 w-full z-10 mb-2">
          <div className="w-full flex justify-between items-center mb-2">
            <div className={`font-black tracking-widest text-xs sm:text-sm ${isGameStarted ? getTeamNeon(currentTurn) : 'text-slate-500'}`}>
@@ -514,10 +514,8 @@ export default function SequenceGame() {
          )}
       </div>
 
-      {/* --- RESPONSIVE CENTER AREA --- */}
       <div className="flex-1 flex flex-col md:flex-row items-center md:justify-center w-full relative z-10 md:h-full md:overflow-hidden md:pr-4 pb-2 shrink-0 gap-4 md:gap-6 lg:gap-10">
         
-        {/* DESKTOP ONLY: Vertical Hand on the Left */}
         {!winner && (
           <div className="hidden md:flex flex-col items-center shrink-0 w-24 lg:w-32 z-20">
              <div className="flex flex-col -space-y-10 lg:-space-y-12">
@@ -530,16 +528,13 @@ export default function SequenceGame() {
              </div>
              
              <div className="h-12 flex items-center justify-center mt-6 w-full">
-               {isMyTurn && isDeadCard && (
+               {isMyTurn && isDeadCard && timeLeft > 0 && (
                  <button onClick={() => {socket.emit('trade_dead_card', {roomId: currentRoom, playerId: playerIdRef.current, deadCard: selectedCard}); setSelectedCard(null)}} className="bg-rose-600 px-4 py-2 rounded-full font-bold text-xs animate-bounce shadow-lg shadow-rose-500/50 text-white border border-rose-400">TRADE DEAD</button>
                )}
              </div>
           </div>
         )}
 
-        {/* --- DYNAMIC NO-SCROLL BOARD --- 
-            On Mobile: Constrains height strictly so menus and hand fit without scrolling.
-            On Desktop: Maximizes to the window's height. */}
         <div 
            className="w-full mx-auto rounded-xl sm:rounded-[1rem] border border-white/20 shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden shrink-0 bg-white/5 p-[2px] sm:p-1 md:p-2 relative transition-all duration-500 max-w-[var(--max-w-mobile)] md:max-w-[var(--max-w-desktop)]"
            style={{ 
@@ -606,7 +601,6 @@ export default function SequenceGame() {
           </p>
         </div>
 
-        {/* MOBILE ONLY: Horizontal Hand on the Bottom */}
         <div className="md:hidden w-full shrink-0 flex flex-col items-center mt-2">
           <p className="text-[10px] font-bold opacity-70 mb-2 tracking-widest text-center">RIGHT CLICK BOARD TO PING</p>
           {!winner && (
@@ -621,7 +615,7 @@ export default function SequenceGame() {
               </div>
               
               <div className="h-10 flex items-center justify-center mt-2 w-full">
-                {isMyTurn && isDeadCard && (
+                {isMyTurn && isDeadCard && timeLeft > 0 && (
                   <button onClick={() => {socket.emit('trade_dead_card', {roomId: currentRoom, playerId: playerIdRef.current, deadCard: selectedCard}); setSelectedCard(null)}} className="bg-rose-600 px-6 py-2 rounded-full font-bold text-[10px] sm:text-xs animate-bounce shadow-lg shadow-rose-500/50 text-white border border-rose-400">TRADE DEAD CARD</button>
                 )}
               </div>
@@ -632,7 +626,6 @@ export default function SequenceGame() {
 
       <div className="w-full md:w-80 lg:w-96 flex flex-col gap-3 min-h-[300px] md:h-full relative z-10 shrink-0">
         
-        {/* DESKTOP STATUS BAR (Visible only on PC) */}
         <div className="hidden md:flex bg-black/40 border border-white/10 rounded-2xl flex-col p-3 shadow-lg shrink-0">
            <div className="w-full flex justify-between items-center mb-2">
              <div className={`font-black tracking-widest text-xs sm:text-sm ${isGameStarted ? getTeamNeon(currentTurn) : 'text-slate-500'}`}>
