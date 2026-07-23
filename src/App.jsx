@@ -12,7 +12,6 @@ const playSound = (type) => {
   if (sounds[type] && sounds[type].src) sounds[type].play().catch(() => {});
 };
 
-// --- ADDED ANIMATIONS FOR EMOTES AND CARD DRAWS ---
 const chipAnimationStyles = `
   @keyframes chipDrop {
     0% { transform: scale(2) translateY(-20px); opacity: 0; box-shadow: 0 20px 20px rgba(0,0,0,0.6); }
@@ -113,8 +112,6 @@ export default function SequenceGame() {
   const [chats, setChats] = useState([]);
   const [activePings, setActivePings] = useState({});
   const [showRules, setShowRules] = useState(false);
-
-  // NEW: State for tracking active floating emotes
   const [activeEmotes, setActiveEmotes] = useState({});
 
   useEffect(() => {
@@ -191,13 +188,9 @@ export default function SequenceGame() {
       }, 100);
     };
 
-    // --- NEW: Emote Listener ---
     const handleReceiveEmote = ({ name, emote }) => {
-      // Force unique key so animation restarts if they spam the same emote
       const emoteKey = `${emote}-${Date.now()}`; 
       setActiveEmotes(prev => ({ ...prev, [name]: emoteKey }));
-      
-      // Clear emote after animation finishes
       setTimeout(() => {
         setActiveEmotes(prev => {
           const newState = { ...prev };
@@ -290,7 +283,6 @@ export default function SequenceGame() {
     }
   };
 
-  // --- NEW: Emote Dispatcher ---
   const handleSendEmote = (emote) => {
     if (!isGameStarted) return;
     const fullPlayerName = `${avatar} ${playerName}`;
@@ -310,7 +302,6 @@ export default function SequenceGame() {
     return indices.every(i => boardChips[i] !== null);
   };
 
-  // --- NEW: Smart Highlighter Logic ---
   const getValidIndices = () => {
     if (!selectedCard) return [];
     const isTwoEyed = selectedCard === 'J♦' || selectedCard === 'J♣';
@@ -412,8 +403,6 @@ export default function SequenceGame() {
   const isMyTurn = playerIdRef.current === activePlayerId && isGameStarted && !winner;
   const isDeadCard = selectedCard && checkDeadCard(selectedCard);
   const strokeColor = winner === 'red' ? '#ef4444' : winner === 'blue' ? '#3b82f6' : '#22c55e';
-  
-  // Calculate valid spaces for the Smart Highlighter
   const validSpaces = getValidIndices();
 
   return (
@@ -498,9 +487,10 @@ export default function SequenceGame() {
         </div>
       )}
 
-      <div className="flex-1 flex flex-col items-center justify-start w-full relative z-10 md:h-full md:overflow-y-auto md:pr-4 pb-12 shrink-0 scroll-smooth">
+      {/* --- NEW DESKTOP NO-SCROLL LAYOUT LOGIC --- */}
+      <div className="flex-1 flex flex-col items-center justify-center w-full relative z-10 md:h-full md:overflow-hidden md:pr-4 pb-2 sm:pb-4 shrink-0">
         
-        <div className="w-full flex flex-col bg-black/40 border border-white/10 p-2 sm:p-3 rounded-xl sm:rounded-2xl mt-2 mb-4 shadow-sm backdrop-blur-md shrink-0 relative overflow-hidden">
+        <div className="w-full flex flex-col bg-black/40 border border-white/10 p-2 sm:p-3 rounded-xl sm:rounded-2xl mb-2 sm:mb-4 shadow-sm backdrop-blur-md shrink-0 relative overflow-hidden">
            <div className="w-full flex justify-between items-center z-10">
              <div className={`font-black tracking-widest text-xs sm:text-base ${isGameStarted ? getTeamNeon(currentTurn) : 'text-slate-500'}`}>
                {winner ? 'MATCH COMPLETE' : isGameStarted ? `${activePlayerName}'S TURN` : 'STANDBY...'}
@@ -526,8 +516,11 @@ export default function SequenceGame() {
            )}
         </div>
 
-        <div className="w-full max-w-[95vw] md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto rounded-xl sm:rounded-[1rem] border border-white/20 shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden shrink-0 bg-white/5 p-1 sm:p-2 relative transition-all duration-500">
-          
+        {/* --- DYNAMIC VIEWPORT HEIGHT CALCULATION TO PREVENT DESKTOP SCROLLING --- */}
+        <div 
+           className="w-full mx-auto rounded-xl sm:rounded-[1rem] border border-white/20 shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden shrink-0 bg-white/5 p-1 sm:p-2 relative transition-all duration-500"
+           style={{ maxWidth: 'min(95vw, calc((100dvh - 280px) * 0.75))' }}
+        >
           <div className="grid grid-cols-10 gap-[2px] sm:gap-[3px] w-full bg-transparent relative z-10">
             {BOARD_LAYOUT.map((card, idx) => {
               const chip = boardChips[idx];
@@ -535,7 +528,6 @@ export default function SequenceGame() {
               const isPung = activePings[idx];
               const isLastMove = lastMoveIndex === idx; 
               
-              // --- NEW: Smart Highlighter Visual Logic ---
               const isValidSpace = isMyTurn && selectedCard && validSpaces.includes(idx);
               const isDimmed = isMyTurn && selectedCard && !validSpaces.includes(idx) && BOARD_LAYOUT[idx] !== 'FREE';
 
@@ -581,25 +573,27 @@ export default function SequenceGame() {
               />
             </svg>
           )}
-
         </div>
 
-        <div className="w-full mt-4 sm:mt-8 flex flex-col items-center shrink-0">
-          <p className="text-[10px] sm:text-xs font-bold opacity-70 mb-2 sm:mb-4 tracking-widest text-center">RIGHT CLICK BOARD TO PING TEAMMATES</p>
+        <div className="w-full shrink-0 flex flex-col items-center mt-2 sm:mt-4">
+          <p className="text-[10px] sm:text-xs font-bold opacity-70 mb-2 tracking-widest text-center">RIGHT CLICK BOARD TO PING TEAMMATES</p>
           {!winner && (
             <>
               <div className="flex -space-x-3 sm:-space-x-4">
                 {(hand || []).map((card, i) => (
-                  // --- NEW: Card Draw Animation Key Injection ---
                   <div key={`hand-${i}-${card}`} onClick={() => isMyTurn && setSelectedCard(card)} 
                        className={`relative w-12 h-16 sm:w-16 sm:h-24 md:w-20 md:h-28 flex items-center justify-center origin-bottom transition-all duration-300 rounded-[3px] sm:rounded-md card-draw ${selectedCard===card?'ring-2 sm:ring-4 ring-cyan-400 -translate-y-4 sm:-translate-y-6 scale-110 z-20 shadow-[0_0_30px_rgba(34,211,238,0.6)]':'z-0 shadow-lg'} ${isMyTurn?'cursor-pointer hover:-translate-y-2 sm:hover:-translate-y-4':'opacity-50'}`}>
                     <CardVisual card={card} />
                   </div>
                 ))}
               </div>
-              {isMyTurn && isDeadCard && (
-                <button onClick={() => {socket.emit('trade_dead_card', {roomId: currentRoom, playerId: playerIdRef.current, deadCard: selectedCard}); setSelectedCard(null)}} className="mt-6 bg-rose-600 px-6 py-2 rounded-full font-bold animate-bounce shadow-lg shadow-rose-500/50 text-white border border-rose-400">TRADE DEAD CARD</button>
-              )}
+              
+              {/* --- PREVENTS SCROLL JUMP WHEN "DEAD CARD" BUTTON APPEARS --- */}
+              <div className="h-10 sm:h-12 flex items-center justify-center mt-2 w-full">
+                {isMyTurn && isDeadCard && (
+                  <button onClick={() => {socket.emit('trade_dead_card', {roomId: currentRoom, playerId: playerIdRef.current, deadCard: selectedCard}); setSelectedCard(null)}} className="bg-rose-600 px-6 py-2 rounded-full font-bold animate-bounce shadow-lg shadow-rose-500/50 text-white border border-rose-400">TRADE DEAD CARD</button>
+                )}
+              </div>
             </>
           )}
         </div>
@@ -621,7 +615,6 @@ export default function SequenceGame() {
 
                     return (
                       <div key={i} className="relative w-full">
-                        {/* --- NEW: Floating Emote UI --- */}
                         {activeEmoteStr && (
                           <span className="absolute -top-6 left-1/2 transform -translate-x-1/2 text-2xl z-50 emote-float drop-shadow-md pointer-events-none">
                             {activeEmoteStr}
@@ -638,7 +631,6 @@ export default function SequenceGame() {
             })}
           </div>
           
-          {/* --- NEW: Emote Button Bar --- */}
           {isGameStarted && (
             <div className="flex justify-between px-3 py-2 border-t border-white/10 bg-black/20">
                {['🤣', '💀', '🔥', '🏆', '🤬', '👋'].map(emote => (
