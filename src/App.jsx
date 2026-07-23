@@ -487,41 +487,13 @@ export default function SequenceGame() {
         </div>
       )}
 
-      {/* --- NEW DESKTOP NO-SCROLL LAYOUT LOGIC --- */}
-      <div className="flex-1 flex flex-col items-center justify-center w-full relative z-10 md:h-full md:overflow-hidden md:pr-4 pb-2 sm:pb-4 shrink-0">
+      {/* --- RE-ARCHITECTED LEFT COLUMN FOR MASSIVE BOARD --- */}
+      <div className="flex-1 flex flex-col items-center justify-center w-full relative z-10 md:h-full md:overflow-hidden shrink-0">
         
-        <div className="w-full flex flex-col bg-black/40 border border-white/10 p-2 sm:p-3 rounded-xl sm:rounded-2xl mb-2 sm:mb-4 shadow-sm backdrop-blur-md shrink-0 relative overflow-hidden">
-           <div className="w-full flex justify-between items-center z-10">
-             <div className={`font-black tracking-widest text-xs sm:text-base ${isGameStarted ? getTeamNeon(currentTurn) : 'text-slate-500'}`}>
-               {winner ? 'MATCH COMPLETE' : isGameStarted ? `${activePlayerName}'S TURN` : 'STANDBY...'}
-             </div>
-             
-             <div className="flex items-center gap-2 sm:gap-3">
-               <button onClick={() => setShowRules(true)} className="bg-white/10 border border-white/20 text-white px-2 py-1.5 sm:px-3 rounded-lg text-[10px] sm:text-xs font-bold hover:bg-white/20 transition-colors active:scale-95 tracking-widest flex items-center gap-1">
-                 <span className="text-sm sm:text-base leading-none">❓</span> RULES
-               </button>
-               <button onClick={handleDisconnect} className="bg-rose-500/20 border border-rose-500/40 text-rose-200 px-2 py-1.5 sm:px-3 rounded-lg text-[10px] sm:text-xs font-bold hover:bg-rose-500/40 transition-colors active:scale-95 tracking-widest flex items-center gap-1">
-                 <span className="text-sm sm:text-base leading-none">🚪</span> QUIT
-               </button>
-             </div>
-           </div>
-           
-           {isGameStarted && !winner && (
-             <div className="w-full h-1 sm:h-1.5 bg-black/50 rounded-full overflow-hidden mt-2 z-10">
-               <div 
-                 className={`h-full transition-all duration-1000 linear ${timeLeft <= 10 ? 'bg-red-500 animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.8)]' : 'bg-cyan-400'}`}
-                 style={{ width: `${Math.min(100, Math.max(0, (timeLeft / 60) * 100))}%` }}
-               />
-             </div>
-           )}
-        </div>
-
-        {/* --- DYNAMIC VIEWPORT HEIGHT CALCULATION TO PREVENT DESKTOP SCROLLING --- */}
-        <div 
-           className="w-full mx-auto rounded-xl sm:rounded-[1rem] border border-white/20 shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden shrink-0 bg-white/5 p-1 sm:p-2 relative transition-all duration-500"
-           style={{ maxWidth: 'min(95vw, calc((100dvh - 280px) * 0.75))' }}
-        >
-          <div className="grid grid-cols-10 gap-[2px] sm:gap-[3px] w-full bg-transparent relative z-10">
+        {/* NEW SCALING WRAPPER: Constrains width precisely so height never requires scrolling */}
+        <div className="w-full max-w-[min(100%,60vh)] mx-auto rounded-xl sm:rounded-[1rem] border border-white/20 shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden shrink-0 bg-white/5 p-[2px] sm:p-1 md:p-2 relative transition-all duration-500">
+          
+          <div className="grid grid-cols-10 gap-[1px] sm:gap-[2px] w-full bg-transparent relative z-10">
             {BOARD_LAYOUT.map((card, idx) => {
               const chip = boardChips[idx];
               const isWinChip = winningLine.includes(idx);
@@ -540,7 +512,7 @@ export default function SequenceGame() {
 
               return (
                 <div key={idx} onClick={() => handleCellClick(idx)} onContextMenu={(e) => handlePing(e, idx)}
-                     className={`relative aspect-[3/4] flex items-center justify-center transition-all duration-300 ${cellHighlightStyle} ${winner && !isWinChip ? 'opacity-30' : ''} ${isPung ? 'ring-2 ring-rose-500 animate-pulse rounded-[3px] sm:rounded-md' : ''}`}>
+                     className={`relative aspect-[3/4] w-full h-full flex items-center justify-center transition-all duration-300 ${cellHighlightStyle} ${winner && !isWinChip ? 'opacity-30' : ''} ${isPung ? 'ring-2 ring-rose-500 animate-pulse rounded-[3px] sm:rounded-md' : ''}`}>
 
                   {isPung && <div className="absolute inset-0 bg-rose-500/40 rounded animate-ping pointer-events-none z-20"></div>}
 
@@ -575,23 +547,25 @@ export default function SequenceGame() {
           )}
         </div>
 
-        <div className="w-full shrink-0 flex flex-col items-center mt-2 sm:mt-4">
-          <p className="text-[10px] sm:text-xs font-bold opacity-70 mb-2 tracking-widest text-center">RIGHT CLICK BOARD TO PING TEAMMATES</p>
+        {/* --- COMPACT HAND CONTAINER --- */}
+        <div className="w-full shrink-0 flex flex-col items-center mt-3 sm:mt-4">
+          <p className="text-[10px] sm:text-xs font-bold opacity-70 mb-2 sm:mb-3 tracking-widest text-center">RIGHT CLICK BOARD TO PING TEAMMATES</p>
           {!winner && (
             <>
               <div className="flex -space-x-3 sm:-space-x-4">
                 {(hand || []).map((card, i) => (
                   <div key={`hand-${i}-${card}`} onClick={() => isMyTurn && setSelectedCard(card)} 
-                       className={`relative w-12 h-16 sm:w-16 sm:h-24 md:w-20 md:h-28 flex items-center justify-center origin-bottom transition-all duration-300 rounded-[3px] sm:rounded-md card-draw ${selectedCard===card?'ring-2 sm:ring-4 ring-cyan-400 -translate-y-4 sm:-translate-y-6 scale-110 z-20 shadow-[0_0_30px_rgba(34,211,238,0.6)]':'z-0 shadow-lg'} ${isMyTurn?'cursor-pointer hover:-translate-y-2 sm:hover:-translate-y-4':'opacity-50'}`}>
+                       /* Reduced size here: md:w-14 md:h-20 saves massive vertical space */
+                       className={`relative w-10 h-14 sm:w-12 sm:h-16 md:w-14 md:h-20 flex items-center justify-center origin-bottom transition-all duration-300 rounded-[3px] sm:rounded-md card-draw ${selectedCard===card?'ring-2 sm:ring-4 ring-cyan-400 -translate-y-4 sm:-translate-y-6 scale-110 z-20 shadow-[0_0_30px_rgba(34,211,238,0.6)]':'z-0 shadow-lg'} ${isMyTurn?'cursor-pointer hover:-translate-y-2 sm:hover:-translate-y-4':'opacity-50'}`}>
                     <CardVisual card={card} />
                   </div>
                 ))}
               </div>
               
-              {/* --- PREVENTS SCROLL JUMP WHEN "DEAD CARD" BUTTON APPEARS --- */}
+              {/* Wrapped trade button in fixed height div so layout doesn't jump when it appears */}
               <div className="h-10 sm:h-12 flex items-center justify-center mt-2 w-full">
                 {isMyTurn && isDeadCard && (
-                  <button onClick={() => {socket.emit('trade_dead_card', {roomId: currentRoom, playerId: playerIdRef.current, deadCard: selectedCard}); setSelectedCard(null)}} className="bg-rose-600 px-6 py-2 rounded-full font-bold animate-bounce shadow-lg shadow-rose-500/50 text-white border border-rose-400">TRADE DEAD CARD</button>
+                  <button onClick={() => {socket.emit('trade_dead_card', {roomId: currentRoom, playerId: playerIdRef.current, deadCard: selectedCard}); setSelectedCard(null)}} className="bg-rose-600 px-6 py-2 rounded-full font-bold text-[10px] sm:text-xs animate-bounce shadow-lg shadow-rose-500/50 text-white border border-rose-400">TRADE DEAD CARD</button>
                 )}
               </div>
             </>
@@ -599,8 +573,36 @@ export default function SequenceGame() {
         </div>
       </div>
 
-      <div className="w-full md:w-80 lg:w-96 flex flex-col gap-4 min-h-[300px] md:h-full relative z-10 shrink-0">
+      {/* --- RIGHT COLUMN: MENUS MOVED HERE --- */}
+      <div className="w-full md:w-80 lg:w-96 flex flex-col gap-3 min-h-[300px] md:h-full relative z-10 shrink-0">
         
+        {/* NEW MOVED CONTROL PANEL */}
+        <div className="bg-black/40 border border-white/10 rounded-2xl flex flex-col p-3 shadow-lg shrink-0">
+           <div className="w-full flex justify-between items-center mb-2">
+             <div className={`font-black tracking-widest text-xs sm:text-sm ${isGameStarted ? getTeamNeon(currentTurn) : 'text-slate-500'}`}>
+               {winner ? 'MATCH COMPLETE' : isGameStarted ? `${activePlayerName}'S TURN` : 'STANDBY...'}
+             </div>
+             
+             <div className="flex items-center gap-2">
+               <button onClick={() => setShowRules(true)} className="bg-white/10 border border-white/20 text-white px-2 py-1 rounded-md text-[10px] font-bold hover:bg-white/20 transition-colors active:scale-95 tracking-widest flex items-center gap-1">
+                 ❓ RULES
+               </button>
+               <button onClick={handleDisconnect} className="bg-rose-500/20 border border-rose-500/40 text-rose-200 px-2 py-1 rounded-md text-[10px] font-bold hover:bg-rose-500/40 transition-colors active:scale-95 tracking-widest flex items-center gap-1">
+                 🚪 QUIT
+               </button>
+             </div>
+           </div>
+           
+           {isGameStarted && !winner && (
+             <div className="w-full h-1.5 bg-black/50 rounded-full overflow-hidden z-10">
+               <div 
+                 className={`h-full transition-all duration-1000 linear ${timeLeft <= 10 ? 'bg-red-500 animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.8)]' : 'bg-cyan-400'}`}
+                 style={{ width: `${Math.min(100, Math.max(0, (timeLeft / 60) * 100))}%` }}
+               />
+             </div>
+           )}
+        </div>
+
         <div className="bg-black/40 border border-white/10 rounded-2xl flex flex-col overflow-visible shadow-lg shrink-0">
           <div className="p-2 sm:p-3 border-b border-white/10 font-bold tracking-widest text-[10px] sm:text-xs opacity-70 text-white">LIVE ROSTER</div>
           <div className="p-2 sm:p-3 grid grid-cols-3 gap-2">
@@ -658,7 +660,7 @@ export default function SequenceGame() {
           </form>
         </div>
 
-        <div className="h-32 sm:h-48 bg-black/40 border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-lg">
+        <div className="h-24 sm:h-32 bg-black/40 border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-lg">
           <div className="p-2 sm:p-3 border-b border-white/10 font-bold tracking-widest text-[10px] sm:text-xs opacity-70 text-white">ACTION LOG</div>
           <div className="flex-1 p-2 sm:p-3 overflow-y-auto flex flex-col gap-1 text-[10px] sm:text-xs opacity-80 text-white">
             {logs.map((log, i) => <div key={i} className="border-b border-white/5 pb-1">⚡ {log}</div>)}
