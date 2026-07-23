@@ -31,7 +31,6 @@ const chipAnimationStyles = `
   }
 `;
 
-// --- REAL HIGH-QUALITY CARD IMAGES ---
 const CardVisual = ({ card }) => {
   if (card === 'FREE') {
     return (
@@ -96,6 +95,9 @@ export default function SequenceGame() {
   const [chatInput, setChatInput] = useState('');
   const [chats, setChats] = useState([]);
   const [activePings, setActivePings] = useState({});
+  
+  // NEW: Toggle for Quick Rules Modal
+  const [showRules, setShowRules] = useState(false);
 
   useEffect(() => {
     let pid = sessionStorage.getItem('sequence_playerId');
@@ -215,6 +217,25 @@ export default function SequenceGame() {
     return () => clearInterval(interval);
   }, [turnDeadline, winner, isGameStarted, activePlayerId, currentRoom]);
 
+  // --- NEW: Browser Tab Alerts when it's your turn ---
+  useEffect(() => {
+    let titleInterval;
+    const isMyTurn = playerIdRef.current === activePlayerId && isGameStarted && !winner;
+    
+    if (isMyTurn) {
+      titleInterval = setInterval(() => {
+        document.title = document.title === 'SEQUENCE' ? '🔴 YOUR TURN!' : 'SEQUENCE';
+      }, 1000);
+    } else {
+      document.title = 'SEQUENCE';
+    }
+
+    return () => {
+      clearInterval(titleInterval);
+      document.title = 'SEQUENCE';
+    };
+  }, [activePlayerId, isGameStarted, winner]);
+
   const handleJoinRoom = (e) => {
     e.preventDefault();
     if (roomInput.trim() && playerName.trim()) {
@@ -265,7 +286,6 @@ export default function SequenceGame() {
     setSelectedCard(null);
   };
 
-  // --- NEW: Disconnects the socket and drops the player back to Lobby ---
   const handleDisconnect = () => {
     sessionStorage.clear();
     window.location.reload();
@@ -321,7 +341,6 @@ export default function SequenceGame() {
                 ))}
               </div>
               
-              {/* --- QUIT BUTTON: TEAM SELECT SCREEN --- */}
               <button onClick={handleDisconnect} className="mt-8 bg-transparent border border-white/20 text-white/70 hover:text-white hover:bg-white/10 px-6 py-2 rounded-lg font-bold text-xs tracking-widest transition-all">
                 🚪 LEAVE ROOM
               </button>
@@ -338,6 +357,24 @@ export default function SequenceGame() {
   return (
     <div className={`min-h-[100dvh] md:h-[100dvh] overflow-y-auto md:overflow-hidden ${t.bg} text-white flex flex-col md:flex-row p-2 sm:p-4 gap-4 font-sans relative`}>
       <style>{chipAnimationStyles}</style>
+
+      {/* --- NEW QUICK RULES MODAL --- */}
+      {showRules && (
+        <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+           <div className="bg-gradient-to-br from-slate-900 to-black border border-white/20 p-6 sm:p-8 rounded-2xl shadow-2xl max-w-md w-full relative pointer-events-auto">
+              <button onClick={() => setShowRules(false)} className="absolute top-4 right-4 text-white/50 hover:text-white text-2xl transition-colors">&times;</button>
+              <h2 className="text-2xl font-black mb-6 tracking-widest text-cyan-400">QUICK RULES</h2>
+              <ul className="space-y-4 text-sm text-slate-300">
+                <li><strong className="text-white tracking-widest">OBJECTIVE:</strong> Get 5 chips in a row (horizontally, vertically, or diagonally) to win.</li>
+                <li><strong className="text-amber-400 tracking-widest">FREE SPACES:</strong> The 4 orange corner spaces act as wild chips for everyone.</li>
+                <li><strong className="text-blue-400 tracking-widest">TWO-EYED JACKS:</strong> <span className="text-white">J♦ & J♣</span> are WILD. They let you place a chip on ANY open space.</li>
+                <li><strong className="text-rose-400 tracking-widest">ONE-EYED JACKS:</strong> <span className="text-white">J♠ & J♥</span> are KILL cards. They let you REMOVE an opponent's chip.</li>
+                <li><strong className="text-white tracking-widest">DEAD CARDS:</strong> If a card in your hand has no open matching spaces left on the board, click "TRADE DEAD CARD" on your turn to swap it.</li>
+              </ul>
+              <button onClick={() => setShowRules(false)} className="mt-8 w-full bg-white/10 py-3 rounded-xl font-bold hover:bg-white/20 transition-all text-white tracking-widest active:scale-95 border border-white/10">GOT IT</button>
+           </div>
+        </div>
+      )}
 
       {/* WAITING TO START OVERLAY */}
       {!isGameStarted && !winner && (
@@ -405,18 +442,32 @@ export default function SequenceGame() {
       {/* LEFT COLUMN: Game Board & Hand */}
       <div className="flex-1 flex flex-col items-center justify-start w-full relative z-10 md:h-full md:overflow-y-auto md:pr-4 pb-12 shrink-0 scroll-smooth">
         
-        {/* --- TITLE BAR WITH NEW QUIT BUTTON --- */}
-        <div className="w-full flex justify-between items-center bg-black/40 border border-white/10 p-2 sm:p-3 rounded-xl sm:rounded-2xl mt-2 mb-4 shadow-sm backdrop-blur-md shrink-0">
-           <div className={`font-black tracking-widest text-xs sm:text-base ${isGameStarted ? getTeamNeon(currentTurn) : 'text-slate-500'}`}>
-             {winner ? 'MATCH COMPLETE' : isGameStarted ? `${activePlayerName}'S TURN` : 'STANDBY...'}
+        {/* TITLE BAR & TURN TIMER */}
+        <div className="w-full flex flex-col bg-black/40 border border-white/10 p-2 sm:p-3 rounded-xl sm:rounded-2xl mt-2 mb-4 shadow-sm backdrop-blur-md shrink-0 relative overflow-hidden">
+           <div className="w-full flex justify-between items-center z-10">
+             <div className={`font-black tracking-widest text-xs sm:text-base ${isGameStarted ? getTeamNeon(currentTurn) : 'text-slate-500'}`}>
+               {winner ? 'MATCH COMPLETE' : isGameStarted ? `${activePlayerName}'S TURN` : 'STANDBY...'}
+             </div>
+             
+             <div className="flex items-center gap-2 sm:gap-3">
+               <button onClick={() => setShowRules(true)} className="bg-white/10 border border-white/20 text-white px-2 py-1.5 sm:px-3 rounded-lg text-[10px] sm:text-xs font-bold hover:bg-white/20 transition-colors active:scale-95 tracking-widest flex items-center gap-1">
+                 <span className="text-sm sm:text-base leading-none">❓</span> RULES
+               </button>
+               <button onClick={handleDisconnect} className="bg-rose-500/20 border border-rose-500/40 text-rose-200 px-2 py-1.5 sm:px-3 rounded-lg text-[10px] sm:text-xs font-bold hover:bg-rose-500/40 transition-colors active:scale-95 tracking-widest flex items-center gap-1">
+                 <span className="text-sm sm:text-base leading-none">🚪</span> QUIT
+               </button>
+             </div>
            </div>
            
-           <div className="flex items-center gap-3 sm:gap-4">
-             <div className="font-bold text-xs sm:text-base opacity-70 tracking-widest hidden md:block">SEQUENCE CLASSIC</div>
-             <button onClick={handleDisconnect} className="bg-rose-500/20 border border-rose-500/40 text-rose-200 px-3 py-1.5 sm:px-4 rounded-lg text-[10px] sm:text-xs font-bold hover:bg-rose-500/40 transition-colors active:scale-95 tracking-widest flex items-center gap-1 sm:gap-2">
-               <span className="text-sm sm:text-base leading-none">🚪</span> QUIT
-             </button>
-           </div>
+           {/* --- NEW VISUAL TURN TIMER --- */}
+           {isGameStarted && !winner && (
+             <div className="w-full h-1 sm:h-1.5 bg-black/50 rounded-full overflow-hidden mt-2 z-10">
+               <div 
+                 className={`h-full transition-all duration-1000 linear ${timeLeft <= 10 ? 'bg-red-500 animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.8)]' : 'bg-cyan-400'}`}
+                 style={{ width: `${Math.min(100, Math.max(0, (timeLeft / 60) * 100))}%` }}
+               />
+             </div>
+           )}
         </div>
 
         <div className="w-full max-w-[95vw] md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto rounded-xl sm:rounded-[1rem] border border-white/20 shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden shrink-0 bg-white/5 p-1 sm:p-2 relative">
@@ -487,27 +538,51 @@ export default function SequenceGame() {
         </div>
       </div>
 
-      {/* RIGHT COLUMN: Social Panel */}
+      {/* RIGHT COLUMN: Social Panel & Live Roster */}
       <div className="w-full md:w-80 lg:w-96 flex flex-col gap-4 min-h-[300px] md:h-full relative z-10 shrink-0">
+        
+        {/* --- NEW LIVE ROSTER --- */}
+        <div className="bg-black/40 border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-lg shrink-0">
+          <div className="p-2 sm:p-3 border-b border-white/10 font-bold tracking-widest text-[10px] sm:text-xs opacity-70 text-white">LIVE ROSTER</div>
+          <div className="p-2 sm:p-3 grid grid-cols-3 gap-2">
+            {['red', 'blue', 'green'].map(color => {
+              if (!roomInfo[color] || roomInfo[color].length === 0) return null;
+              return (
+                <div key={color} className="flex flex-col gap-1.5">
+                  <span className={`font-black uppercase text-[10px] tracking-wider ${getTeamNeon(color)}`}>{color}</span>
+                  {roomInfo[color].map((p, i) => {
+                    const isActive = p === activePlayerName && isGameStarted && !winner;
+                    return (
+                      <div key={i} className={`truncate px-1.5 py-0.5 rounded text-[10px] sm:text-xs transition-all ${isActive ? 'bg-white/20 text-white font-bold ring-1 ring-white/50 shadow-[0_0_10px_rgba(255,255,255,0.2)] animate-pulse' : 'text-white/60'}`}>
+                        {p}
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
         <div className="bg-black/40 border border-white/10 rounded-2xl flex-1 flex flex-col overflow-hidden shadow-lg">
-          <div className="p-3 border-b border-white/10 font-bold tracking-widest text-xs opacity-70 text-white">COMMUNICATIONS</div>
-          <div className="chat-scroll-container flex-1 p-3 overflow-y-auto flex flex-col gap-2 text-sm">
+          <div className="p-2 sm:p-3 border-b border-white/10 font-bold tracking-widest text-[10px] sm:text-xs opacity-70 text-white">COMMUNICATIONS</div>
+          <div className="chat-scroll-container flex-1 p-2 sm:p-3 overflow-y-auto flex flex-col gap-2 text-sm">
             {chats.map((c, i) => (
-              <div key={i} className={`p-2 rounded-lg max-w-[90%] text-white ${c.name === playerName ? 'bg-white/20 self-end' : 'bg-black/40 self-start border-l-2'} ${c.team==='red'?'border-rose-500':c.team==='blue'?'border-cyan-500':'border-emerald-500'}`}>
-                <span className="font-bold text-xs opacity-50 block mb-1">{c.name}</span>
+              <div key={i} className={`p-2 rounded-lg max-w-[90%] text-white text-xs sm:text-sm ${c.name === playerName ? 'bg-white/20 self-end' : 'bg-black/40 self-start border-l-2'} ${c.team==='red'?'border-rose-500':c.team==='blue'?'border-cyan-500':'border-emerald-500'}`}>
+                <span className="font-bold text-[10px] opacity-50 block mb-1 tracking-wider">{c.name}</span>
                 {c.msg}
               </div>
             ))}
           </div>
           <form onSubmit={handleSendChat} className="p-2 border-t border-white/10 flex gap-2 bg-black/60">
-            <input type="text" value={chatInput} onChange={e=>setChatInput(e.target.value)} placeholder="Send message..." className="flex-1 bg-transparent focus:outline-none text-sm px-2 text-white"/>
-            <button type="submit" className="bg-white/20 text-white px-3 py-1 rounded-md text-xs font-bold active:scale-95">SEND</button>
+            <input type="text" value={chatInput} onChange={e=>setChatInput(e.target.value)} placeholder="Send message..." className="flex-1 bg-transparent focus:outline-none text-xs sm:text-sm px-2 text-white"/>
+            <button type="submit" className="bg-white/20 text-white px-3 py-1.5 rounded-md text-[10px] sm:text-xs font-bold active:scale-95 tracking-widest">SEND</button>
           </form>
         </div>
 
-        <div className="h-48 bg-black/40 border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-lg">
-          <div className="p-3 border-b border-white/10 font-bold tracking-widest text-xs opacity-70 text-white">ACTION LOG</div>
-          <div className="flex-1 p-3 overflow-y-auto flex flex-col gap-1 text-xs opacity-80 text-white">
+        <div className="h-32 sm:h-48 bg-black/40 border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-lg">
+          <div className="p-2 sm:p-3 border-b border-white/10 font-bold tracking-widest text-[10px] sm:text-xs opacity-70 text-white">ACTION LOG</div>
+          <div className="flex-1 p-2 sm:p-3 overflow-y-auto flex flex-col gap-1 text-[10px] sm:text-xs opacity-80 text-white">
             {logs.map((log, i) => <div key={i} className="border-b border-white/5 pb-1">⚡ {log}</div>)}
           </div>
         </div>
