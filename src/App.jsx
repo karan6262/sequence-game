@@ -136,7 +136,6 @@ export default function SequenceGame() {
 
       if (gameState.winner && !winner) {
         playSound('win');
-        // Triggers the confetti blasts
         setTimeout(() => {
           confetti({ particleCount: 250, spread: 150, origin: { y: 0.6 }, colors: [gameState.winner === 'red' ? '#ef4444' : gameState.winner === 'blue' ? '#3b82f6' : '#22c55e', '#ffffff'] });
         }, 200);
@@ -266,6 +265,7 @@ export default function SequenceGame() {
     setSelectedCard(null);
   };
 
+  // --- NEW: Disconnects the socket and drops the player back to Lobby ---
   const handleDisconnect = () => {
     sessionStorage.clear();
     window.location.reload();
@@ -293,11 +293,11 @@ export default function SequenceGame() {
          <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-300 tracking-[0.2em]">SEQUENCE</h2>
        </div>
 
-       <div className="bg-black/30 backdrop-blur-md p-8 rounded-3xl border border-white/10 shadow-2xl w-full max-w-2xl text-center z-10">
+       <div className="bg-black/30 backdrop-blur-md p-8 rounded-3xl border border-white/10 shadow-2xl w-full max-w-2xl text-center z-10 flex flex-col items-center">
           <h1 className="text-5xl font-bold text-white mb-8 tracking-[0.2em]">SEQUENCE</h1>
 
           {appState === 'lobby' ? (
-            <form onSubmit={handleJoinRoom} className="flex flex-col gap-4 max-w-md mx-auto">
+            <form onSubmit={handleJoinRoom} className="flex flex-col gap-4 w-full max-w-md mx-auto">
               <div className="flex justify-center gap-2 mb-4">
                 {AVATARS.map(a => (
                   <div key={a} onClick={()=>setAvatar(a)} className={`text-2xl cursor-pointer p-2 rounded-xl transition-all ${avatar===a?'bg-white/20 scale-125':'hover:scale-110'}`}>{a}</div>
@@ -308,16 +308,23 @@ export default function SequenceGame() {
               <button className="bg-white text-black font-black py-4 rounded-xl mt-4 hover:scale-105 transition-transform active:scale-95">JOIN SQUAD</button>
             </form>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {['red','blue','green'].map(color => (
-                <div key={color} className="flex flex-col gap-2 border border-white/10 p-4 rounded-2xl bg-black/40">
-                  <h3 className={`font-black text-xl uppercase ${getTeamNeon(color)}`}>{color}</h3>
-                  <div className="text-sm font-bold opacity-70 mb-4 h-16">{roomInfo[color]?.join(', ') || 'Empty'}</div>
-                  <button onClick={() => socket.emit('join_team', {roomId: currentRoom, teamColor: color, playerId: playerIdRef.current})} disabled={roomInfo[color]?.length >= 4} className="bg-white/20 py-2 rounded-lg font-bold hover:bg-white/30 transition-colors text-white transform active:scale-95">
-                    JOIN TEAM
-                  </button>
-                </div>
-              ))}
+            <div className="w-full flex flex-col items-center">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
+                {['red','blue','green'].map(color => (
+                  <div key={color} className="flex flex-col gap-2 border border-white/10 p-4 rounded-2xl bg-black/40">
+                    <h3 className={`font-black text-xl uppercase ${getTeamNeon(color)}`}>{color}</h3>
+                    <div className="text-sm font-bold opacity-70 mb-4 h-16">{roomInfo[color]?.join(', ') || 'Empty'}</div>
+                    <button onClick={() => socket.emit('join_team', {roomId: currentRoom, teamColor: color, playerId: playerIdRef.current})} disabled={roomInfo[color]?.length >= 4} className="bg-white/20 py-2 rounded-lg font-bold hover:bg-white/30 transition-colors text-white transform active:scale-95">
+                      JOIN TEAM
+                    </button>
+                  </div>
+                ))}
+              </div>
+              
+              {/* --- QUIT BUTTON: TEAM SELECT SCREEN --- */}
+              <button onClick={handleDisconnect} className="mt-8 bg-transparent border border-white/20 text-white/70 hover:text-white hover:bg-white/10 px-6 py-2 rounded-lg font-bold text-xs tracking-widest transition-all">
+                🚪 LEAVE ROOM
+              </button>
             </div>
           )}
        </div>
@@ -326,8 +333,6 @@ export default function SequenceGame() {
 
   const isMyTurn = playerIdRef.current === activePlayerId && isGameStarted && !winner;
   const isDeadCard = selectedCard && checkDeadCard(selectedCard);
-
-  // Line drawing colors
   const strokeColor = winner === 'red' ? '#ef4444' : winner === 'blue' ? '#3b82f6' : '#22c55e';
 
   return (
@@ -386,7 +391,7 @@ export default function SequenceGame() {
         </div>
       )}
 
-      {/* --- NEW FLOATING GAME OVER MODAL (No Board Blackout) --- */}
+      {/* GAME OVER MODAL */}
       {winner && (
         <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[100] bg-black/80 backdrop-blur-md border border-white/20 p-6 sm:p-10 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.8)] flex flex-col items-center justify-center animate-in fade-in zoom-in duration-500 w-[90vw] max-w-lg pointer-events-auto">
           <h1 className={`text-5xl sm:text-7xl font-black mb-8 tracking-[0.2em] text-center ${getTeamNeon(winner)}`}>{winner.toUpperCase()} WINS</h1>
@@ -400,11 +405,18 @@ export default function SequenceGame() {
       {/* LEFT COLUMN: Game Board & Hand */}
       <div className="flex-1 flex flex-col items-center justify-start w-full relative z-10 md:h-full md:overflow-y-auto md:pr-4 pb-12 shrink-0 scroll-smooth">
         
-        <div className="w-full flex justify-between bg-black/40 border border-white/10 p-2 sm:p-3 rounded-xl sm:rounded-2xl mt-2 mb-4 shadow-sm backdrop-blur-md shrink-0">
+        {/* --- TITLE BAR WITH NEW QUIT BUTTON --- */}
+        <div className="w-full flex justify-between items-center bg-black/40 border border-white/10 p-2 sm:p-3 rounded-xl sm:rounded-2xl mt-2 mb-4 shadow-sm backdrop-blur-md shrink-0">
            <div className={`font-black tracking-widest text-xs sm:text-base ${isGameStarted ? getTeamNeon(currentTurn) : 'text-slate-500'}`}>
              {winner ? 'MATCH COMPLETE' : isGameStarted ? `${activePlayerName}'S TURN` : 'STANDBY...'}
            </div>
-           <div className="font-bold text-xs sm:text-base opacity-70 tracking-widest">SEQUENCE CLASSIC</div>
+           
+           <div className="flex items-center gap-3 sm:gap-4">
+             <div className="font-bold text-xs sm:text-base opacity-70 tracking-widest hidden md:block">SEQUENCE CLASSIC</div>
+             <button onClick={handleDisconnect} className="bg-rose-500/20 border border-rose-500/40 text-rose-200 px-3 py-1.5 sm:px-4 rounded-lg text-[10px] sm:text-xs font-bold hover:bg-rose-500/40 transition-colors active:scale-95 tracking-widest flex items-center gap-1 sm:gap-2">
+               <span className="text-sm sm:text-base leading-none">🚪</span> QUIT
+             </button>
+           </div>
         </div>
 
         <div className="w-full max-w-[95vw] md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto rounded-xl sm:rounded-[1rem] border border-white/20 shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden shrink-0 bg-white/5 p-1 sm:p-2 relative">
@@ -436,7 +448,6 @@ export default function SequenceGame() {
             })}
           </div>
 
-          {/* --- NEW SVG ANIMATED STRIKE LINE --- */}
           {winner && winningLine.length === 5 && (
             <svg className="absolute inset-0 w-full h-full pointer-events-none z-40 drop-shadow-2xl">
               <line
