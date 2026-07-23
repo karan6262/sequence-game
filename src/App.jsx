@@ -12,6 +12,7 @@ const playSound = (type) => {
   if (sounds[type] && sounds[type].src) sounds[type].play().catch(() => {});
 };
 
+// --- ADDED ANIMATIONS FOR EMOTES AND CARD DRAWS ---
 const chipAnimationStyles = `
   @keyframes chipDrop {
     0% { transform: scale(2) translateY(-20px); opacity: 0; box-shadow: 0 20px 20px rgba(0,0,0,0.6); }
@@ -28,6 +29,22 @@ const chipAnimationStyles = `
     stroke-dasharray: 100;
     stroke-dashoffset: 100;
     animation: drawLine 1s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  }
+  @keyframes floatUpFade {
+    0% { opacity: 0; transform: translateY(10px) scale(0.8); }
+    20% { opacity: 1; transform: translateY(-5px) scale(1.2); }
+    80% { opacity: 1; transform: translateY(-15px) scale(1); }
+    100% { opacity: 0; transform: translateY(-25px) scale(0.8); }
+  }
+  .emote-float {
+    animation: floatUpFade 2.5s ease-out forwards;
+  }
+  @keyframes slideDownDraw {
+    from { transform: translateY(-30px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  .card-draw {
+    animation: slideDownDraw 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
   }
 `;
 
@@ -97,6 +114,9 @@ export default function SequenceGame() {
   const [activePings, setActivePings] = useState({});
   const [showRules, setShowRules] = useState(false);
 
+  // NEW: State for tracking active floating emotes
+  const [activeEmotes, setActiveEmotes] = useState({});
+
   useEffect(() => {
     let pid = sessionStorage.getItem('sequence_playerId');
     if (!pid) {
@@ -105,7 +125,6 @@ export default function SequenceGame() {
     }
     playerIdRef.current = pid;
 
-    // NEW: Auto-recover connection if socket mysteriously drops
     const handleConnect = () => {
       const savedRoom = sessionStorage.getItem('sequence_room');
       const savedName = sessionStorage.getItem('sequence_name');
@@ -172,6 +191,22 @@ export default function SequenceGame() {
       }, 100);
     };
 
+    // --- NEW: Emote Listener ---
+    const handleReceiveEmote = ({ name, emote }) => {
+      // Force unique key so animation restarts if they spam the same emote
+      const emoteKey = `${emote}-${Date.now()}`; 
+      setActiveEmotes(prev => ({ ...prev, [name]: emoteKey }));
+      
+      // Clear emote after animation finishes
+      setTimeout(() => {
+        setActiveEmotes(prev => {
+          const newState = { ...prev };
+          if (newState[name] === emoteKey) delete newState[name];
+          return newState;
+        });
+      }, 2500);
+    };
+
     const handleGameRestarted = (allHands) => {
       setWinner(null);
       setWinningLine([]);
@@ -196,16 +231,15 @@ export default function SequenceGame() {
     socket.on('receive_ping', handleReceivePing);
     socket.on('your_hand', handleYourHand);
     socket.on('chat_message', handleChatMessage);
+    socket.on('receive_emote', handleReceiveEmote);
     socket.on('game_restarted', handleGameRestarted);
     socket.on('error_message', handleErrorMessage);
 
-    // Initial load connection attempt
     handleConnect();
 
     return () => socket.offAny();
   }, [winner]);
 
-  // NEW: Emit timeout unconditionally. Server safely validates deadline.
   useEffect(() => {
     if (!turnDeadline || winner || !isGameStarted) {
       setTimeLeft(60);
@@ -256,6 +290,13 @@ export default function SequenceGame() {
     }
   };
 
+  // --- NEW: Emote Dispatcher ---
+  const handleSendEmote = (emote) => {
+    if (!isGameStarted) return;
+    const fullPlayerName = `${avatar} ${playerName}`;
+    socket.emit('send_emote', { roomId: currentRoom, name: fullPlayerName, emote });
+  };
+
   const handlePing = (e, index) => {
     e.preventDefault();
     if (!isGameStarted || winner) return;
@@ -267,6 +308,21 @@ export default function SequenceGame() {
     if (!card || card.includes('J')) return false;
     const indices = BOARD_LAYOUT.map((c, i) => c === card ? i : -1).filter(i => i !== -1);
     return indices.every(i => boardChips[i] !== null);
+  };
+
+  // --- NEW: Smart Highlighter Logic ---
+  const getValidIndices = () => {
+    if (!selectedCard) return [];
+    const isTwoEyed = selectedCard === 'J♦' || selectedCard === 'J♣';
+    const isOneEyed = selectedCard === 'J♠' || selectedCard === 'J♥';
+    
+    if (isTwoEyed) {
+      return boardChips.map((c, i) => c === null && BOARD_LAYOUT[i] !== 'FREE' ? i : -1).filter(i => i !== -1);
+    } else if (isOneEyed) {
+      return boardChips.map((c, i) => c !== null && c !== myTeam && BOARD_LAYOUT[i] !== 'FREE' ? i : -1).filter(i => i !== -1);
+    } else {
+      return BOARD_LAYOUT.map((val, idx) => val === selectedCard && boardChips[idx] === null ? idx : -1).filter(i => i !== -1);
+    }
   };
 
   const handleCellClick = (index) => {
@@ -356,6 +412,9 @@ export default function SequenceGame() {
   const isMyTurn = playerIdRef.current === activePlayerId && isGameStarted && !winner;
   const isDeadCard = selectedCard && checkDeadCard(selectedCard);
   const strokeColor = winner === 'red' ? '#ef4444' : winner === 'blue' ? '#3b82f6' : '#22c55e';
+  
+  // Calculate valid spaces for the Smart Highlighter
+  const validSpaces = getValidIndices();
 
   return (
     <div className={`min-h-[100dvh] md:h-[100dvh] overflow-y-auto md:overflow-hidden ${t.bg} text-white flex flex-col md:flex-row p-2 sm:p-4 gap-4 font-sans relative`}>
@@ -467,7 +526,7 @@ export default function SequenceGame() {
            )}
         </div>
 
-        <div className="w-full max-w-[95vw] md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto rounded-xl sm:rounded-[1rem] border border-white/20 shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden shrink-0 bg-white/5 p-1 sm:p-2 relative">
+        <div className="w-full max-w-[95vw] md:max-w-2xl lg:max-w-3xl xl:max-w-4xl mx-auto rounded-xl sm:rounded-[1rem] border border-white/20 shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden shrink-0 bg-white/5 p-1 sm:p-2 relative transition-all duration-500">
           
           <div className="grid grid-cols-10 gap-[2px] sm:gap-[3px] w-full bg-transparent relative z-10">
             {BOARD_LAYOUT.map((card, idx) => {
@@ -475,11 +534,21 @@ export default function SequenceGame() {
               const isWinChip = winningLine.includes(idx);
               const isPung = activePings[idx];
               const isLastMove = lastMoveIndex === idx; 
-              const isMatch = isMyTurn && selectedCard && ((card === selectedCard && !chip) || (selectedCard.includes('J') && ((selectedCard.includes('♦')||selectedCard.includes('♣'))?!chip:chip&&chip!==myTeam)));
+              
+              // --- NEW: Smart Highlighter Visual Logic ---
+              const isValidSpace = isMyTurn && selectedCard && validSpaces.includes(idx);
+              const isDimmed = isMyTurn && selectedCard && !validSpaces.includes(idx) && BOARD_LAYOUT[idx] !== 'FREE';
+
+              let cellHighlightStyle = '';
+              if (isValidSpace) {
+                cellHighlightStyle = 'ring-2 sm:ring-4 ring-cyan-400 z-20 scale-105 cursor-pointer shadow-[0_0_20px_rgba(34,211,238,0.8)] brightness-110 rounded-[3px] sm:rounded-md';
+              } else if (isDimmed) {
+                cellHighlightStyle = 'opacity-40 grayscale contrast-75';
+              }
 
               return (
                 <div key={idx} onClick={() => handleCellClick(idx)} onContextMenu={(e) => handlePing(e, idx)}
-                     className={`relative aspect-[3/4] flex items-center justify-center ${isMatch?'ring-2 sm:ring-4 ring-cyan-400 z-20 scale-110 cursor-pointer shadow-[0_0_15px_rgba(34,211,238,0.8)] rounded-[3px] sm:rounded-md':''} ${winner && !isWinChip ? 'opacity-30' : ''} ${isPung ? 'ring-2 ring-rose-500 animate-pulse rounded-[3px] sm:rounded-md' : ''}`}>
+                     className={`relative aspect-[3/4] flex items-center justify-center transition-all duration-300 ${cellHighlightStyle} ${winner && !isWinChip ? 'opacity-30' : ''} ${isPung ? 'ring-2 ring-rose-500 animate-pulse rounded-[3px] sm:rounded-md' : ''}`}>
 
                   {isPung && <div className="absolute inset-0 bg-rose-500/40 rounded animate-ping pointer-events-none z-20"></div>}
 
@@ -488,7 +557,7 @@ export default function SequenceGame() {
                   {chip && (
                     <div 
                       key={`chip-${idx}-${chip}`}
-                      className={`absolute w-[80%] sm:w-[75%] aspect-square rounded-full z-10 flex items-center justify-center ${getChipStyle(chip, isWinChip, isLastMove)} pointer-events-none`} 
+                      className={`absolute w-[80%] sm:w-[75%] aspect-square rounded-full z-10 flex items-center justify-center ${getChipStyle(chip, isWinChip, isLastMove)} pointer-events-none transition-all duration-300`} 
                     />
                   )}
                 </div>
@@ -521,8 +590,9 @@ export default function SequenceGame() {
             <>
               <div className="flex -space-x-3 sm:-space-x-4">
                 {(hand || []).map((card, i) => (
-                  <div key={i} onClick={() => isMyTurn && setSelectedCard(card)} 
-                       className={`relative w-12 h-16 sm:w-16 sm:h-24 md:w-20 md:h-28 flex items-center justify-center origin-bottom transition-all rounded-[3px] sm:rounded-md ${selectedCard===card?'ring-2 sm:ring-4 ring-cyan-400 -translate-y-4 sm:-translate-y-6 scale-110 z-20 shadow-[0_0_20px_rgba(34,211,238,0.5)]':'z-0 shadow-lg'} ${isMyTurn?'cursor-pointer hover:-translate-y-2 sm:hover:-translate-y-4':'opacity-50'}`}>
+                  // --- NEW: Card Draw Animation Key Injection ---
+                  <div key={`hand-${i}-${card}`} onClick={() => isMyTurn && setSelectedCard(card)} 
+                       className={`relative w-12 h-16 sm:w-16 sm:h-24 md:w-20 md:h-28 flex items-center justify-center origin-bottom transition-all duration-300 rounded-[3px] sm:rounded-md card-draw ${selectedCard===card?'ring-2 sm:ring-4 ring-cyan-400 -translate-y-4 sm:-translate-y-6 scale-110 z-20 shadow-[0_0_30px_rgba(34,211,238,0.6)]':'z-0 shadow-lg'} ${isMyTurn?'cursor-pointer hover:-translate-y-2 sm:hover:-translate-y-4':'opacity-50'}`}>
                     <CardVisual card={card} />
                   </div>
                 ))}
@@ -537,7 +607,7 @@ export default function SequenceGame() {
 
       <div className="w-full md:w-80 lg:w-96 flex flex-col gap-4 min-h-[300px] md:h-full relative z-10 shrink-0">
         
-        <div className="bg-black/40 border border-white/10 rounded-2xl flex flex-col overflow-hidden shadow-lg shrink-0">
+        <div className="bg-black/40 border border-white/10 rounded-2xl flex flex-col overflow-visible shadow-lg shrink-0">
           <div className="p-2 sm:p-3 border-b border-white/10 font-bold tracking-widest text-[10px] sm:text-xs opacity-70 text-white">LIVE ROSTER</div>
           <div className="p-2 sm:p-3 grid grid-cols-3 gap-2">
             {['red', 'blue', 'green'].map(color => {
@@ -547,9 +617,19 @@ export default function SequenceGame() {
                   <span className={`font-black uppercase text-[10px] tracking-wider ${getTeamNeon(color)}`}>{color}</span>
                   {roomInfo[color].map((p, i) => {
                     const isActive = p === activePlayerName && isGameStarted && !winner;
+                    const activeEmoteStr = activeEmotes[p] ? activeEmotes[p].split('-')[0] : null;
+
                     return (
-                      <div key={i} className={`truncate px-1.5 py-0.5 rounded text-[10px] sm:text-xs transition-all ${isActive ? 'bg-white/20 text-white font-bold ring-1 ring-white/50 shadow-[0_0_10px_rgba(255,255,255,0.2)] animate-pulse' : 'text-white/60'}`}>
-                        {p}
+                      <div key={i} className="relative w-full">
+                        {/* --- NEW: Floating Emote UI --- */}
+                        {activeEmoteStr && (
+                          <span className="absolute -top-6 left-1/2 transform -translate-x-1/2 text-2xl z-50 emote-float drop-shadow-md pointer-events-none">
+                            {activeEmoteStr}
+                          </span>
+                        )}
+                        <div className={`truncate px-1.5 py-0.5 rounded text-[10px] sm:text-xs transition-all ${isActive ? 'bg-white/20 text-white font-bold ring-1 ring-white/50 shadow-[0_0_10px_rgba(255,255,255,0.2)] animate-pulse' : 'text-white/60'}`}>
+                          {p}
+                        </div>
                       </div>
                     )
                   })}
@@ -557,6 +637,17 @@ export default function SequenceGame() {
               )
             })}
           </div>
+          
+          {/* --- NEW: Emote Button Bar --- */}
+          {isGameStarted && (
+            <div className="flex justify-between px-3 py-2 border-t border-white/10 bg-black/20">
+               {['🤣', '💀', '🔥', '🏆', '🤬', '👋'].map(emote => (
+                 <button key={emote} onClick={() => handleSendEmote(emote)} className="text-sm sm:text-base hover:scale-125 transition-transform active:scale-95 opacity-80 hover:opacity-100">
+                   {emote}
+                 </button>
+               ))}
+            </div>
+          )}
         </div>
 
         <div className="bg-black/40 border border-white/10 rounded-2xl flex-1 flex flex-col overflow-hidden shadow-lg">
